@@ -1,7 +1,7 @@
 [package]
 name = "slash"
 version = "0.1.0"
-edition = "2025"
+edition = "2024"
 
 [features]
 default = ["debug", "bevy/dynamic_linking"]
@@ -23,6 +23,7 @@ bevy = { version = "0.17", default-features = false, features = [
 	"bevy_sprite_picking_backend",
 	"bevy_ui_picking_backend",
 	"bevy_input_focus",
+	"bevy_core_pipeline",
 	"wav",
 	"png",
 

@@ -19,7 +19,9 @@ fn main() {
                 }),
                 ..Default::default()
             }),
-        bevy_rand::prelude::EntropyPlugin::<WyRand>::with_seed(69u64.to_le_bytes()),
+        bevy_rand::prelude::EntropyPlugin::<bevy_rand::prelude::WyRand>::with_seed(
+            69u64.to_le_bytes(),
+        ),
     ))
     .add_plugins((
         avian2d::PhysicsPlugins::default().with_length_unit(2.0),
@@ -34,9 +36,8 @@ fn main() {
 }
 
 #[cfg(debug_assertions)]
-fn close_on_escape(input: Input, mut writer: MessageWriter<AppExit>) {
-    use crate::input::Exit;
-    if input.just_pressed::<Exit>() {
+fn close_on_escape(input: Res<ButtonInput<KeyCode>>, mut writer: MessageWriter<AppExit>) {
+    if input.just_pressed(KeyCode::Escape) {
         writer.write(AppExit::Success);
     }
 }
