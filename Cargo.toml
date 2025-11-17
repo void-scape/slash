@@ -6,39 +6,41 @@ edition = "2024"
 [features]
 default = ["debug", "bevy/dynamic_linking"]
 debug = [
-	"avian2d/debug-plugin",
-	"bevy-inspector-egui",
-	"bevy/reflect_auto_register",
+  "avian2d/debug-plugin",
+  "bevy-inspector-egui",
+  "bevy/reflect_auto_register",
 ]
 
 [dependencies]
 bevy = { version = "0.17", default-features = false, features = [
-	"std",
-	"multi_threaded",
-	"bevy_log",
-	"bevy_window",
-	"bevy_winit",
-	"bevy_sprite_render",
-	"bevy_gizmos",
-	"bevy_text",
-	"wav",
-	"png",
+  "std",
+  "multi_threaded",
+  "bevy_log",
+  "bevy_window",
+  "bevy_winit",
+  "bevy_sprite_render",
+  "bevy_gizmos",
+  "bevy_text",
+  "bevy_gilrs",
+  "wav",
+  "png",
 
-	# TODO: remove
-	"default_font",
+  # TODO: remove
+  "default_font",
 ] }
 avian2d = { version = "0.4", default-features = false, features = [
-	"2d",
-	"f32",
-	"parry-f32",
-	"simd",
+  "2d",
+  "f32",
+  "parry-f32",
+  "simd",
 ] }
 bevy_rand = { version = "0.12", default-features = false, features = [
-	"std",
-	"thread_local_entropy",
-	"wyrand",
+  "std",
+  "thread_local_entropy",
+  "wyrand",
 ] }
 rand = "0.9.2"
+bevy_enhanced_input = "0.20.0"
 
 bevy-inspector-egui = { version = "0.34", optional = true }
 

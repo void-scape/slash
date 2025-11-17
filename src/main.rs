@@ -2,6 +2,10 @@
 #![allow(clippy::too_many_arguments)]
 
 use bevy::prelude::*;
+use player::Player;
+
+mod input;
+mod player;
 
 pub const WIDTH: f32 = 1280.0;
 pub const HEIGHT: f32 = 720.0;
@@ -27,12 +31,14 @@ fn main() {
         avian2d::PhysicsPlugins::default().with_length_unit(2.0),
         #[cfg(feature = "debug")]
         avian2d::debug_render::PhysicsDebugPlugin,
+        bevy_enhanced_input::EnhancedInputPlugin,
+        player::PlayerPlugin,
     ));
 
     #[cfg(debug_assertions)]
     app.add_systems(Update, close_on_escape);
 
-    app.add_systems(Startup, camera).run();
+    app.add_systems(Startup, (camera, spawn_player)).run();
 }
 
 #[cfg(debug_assertions)]
@@ -51,4 +57,8 @@ pub fn name(name: impl Into<std::borrow::Cow<'static, str>>) -> Name {
 
 fn camera(mut commands: Commands) {
     commands.spawn(Camera2d);
+}
+
+fn spawn_player(mut commands: Commands) {
+    commands.spawn(Player);
 }
