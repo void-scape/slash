@@ -20,7 +20,7 @@ impl Plugin for EnemyPlugin {
     Transform,
     RigidBody::Dynamic,
     Sprite::from_color(RED, Vec2::new(20.0, 20.0)),
-    Name::new("Enemy"),
+    Name::new("Enemy")
 )]
 pub struct Enemy;
 

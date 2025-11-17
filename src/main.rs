@@ -6,6 +6,8 @@ use bevy::{app::FixedMainScheduleOrder, ecs::schedule::ScheduleLabel, prelude::*
 use player::Player;
 
 use crate::enemy::steering::SteeringTarget;
+#[cfg(feature = "debug")]
+use bevy::input::common_conditions::input_toggle_active;
 
 mod bits;
 mod enemy;
@@ -36,7 +38,8 @@ fn main() {
         #[cfg(feature = "debug")]
         (
             bevy_inspector_egui::bevy_egui::EguiPlugin::default(),
-            bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
+            bevy_inspector_egui::quick::WorldInspectorPlugin::default()
+                .run_if(input_toggle_active(false, KeyCode::KeyI)),
         ),
     ))
     .add_plugins((
@@ -97,7 +100,7 @@ fn spawn_scene(mut commands: Commands) {
                 (weapon::Dagger, bits::BitProducer(50)),
                 (
                     health::FriendlyHurtbox,
-                    avian2d::prelude::Collider::rectangle(100.0, 100.0),
+                    avian2d::prelude::Collider::rectangle(15.0, 15.0),
                     Transform::default(),
                 )
             ],
@@ -112,10 +115,10 @@ fn spawn_scene(mut commands: Commands) {
         children![
             (
                 health::EnemyHurtbox,
-                avian2d::prelude::Collider::rectangle(100.0, 100.0),
+                avian2d::prelude::Collider::rectangle(25.0, 25.0),
                 Transform::default(),
             ),
-            weapon::Dagger
+            (weapon::Dagger, Transform::from_xyz(0.0, 15.0, 0.0))
         ],
     ));
 }

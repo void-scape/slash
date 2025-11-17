@@ -151,20 +151,13 @@ fn propogate_trigger_weapon(
 fn trigger_weapon(
     trigger: On<TriggerWeapon>,
     mut commands: Commands,
-    mut weapons: Query<(&Transform, &AttackDuration, &mut AttackCooldown, &Collider), With<Weapon>>,
+    mut weapons: Query<(&AttackDuration, &mut AttackCooldown, &Collider), With<Weapon>>,
 ) {
-    if let Ok((transform, duration, mut cooldown, collider)) = weapons.get_mut(trigger.entity) {
+    if let Ok((duration, mut cooldown, collider)) = weapons.get_mut(trigger.entity) {
         if !cooldown.0.is_finished() {
             return;
         }
         cooldown.0.reset();
-
-        let translation = transform.translation.normalize_or_zero().xy();
-        let angle = if translation != Vec2::ZERO {
-            Vec2::Y.angle_to(translation)
-        } else {
-            0.0
-        };
 
         if trigger.friendly {
             commands.spawn((
@@ -172,7 +165,7 @@ fn trigger_weapon(
                 FriendlyHitbox,
                 duration.clone(),
                 collider.clone(),
-                Transform::from_rotation(Quat::from_rotation_z(angle)),
+                Transform::default(),
             ));
         } else {
             commands.spawn((
@@ -180,7 +173,7 @@ fn trigger_weapon(
                 EnemyHitbox,
                 duration.clone(),
                 collider.clone(),
-                Transform::from_rotation(Quat::from_rotation_z(angle)),
+                Transform::default(),
             ));
         }
     }

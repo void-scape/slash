@@ -16,23 +16,21 @@ impl Plugin for InputPlugin {
 }
 
 fn inject_bindings(trigger: On<Insert, Player>, mut commands: Commands) {
-    commands
-        .entity(trigger.entity)
-        .insert(actions!(Player[
-            (
-                Action::<Move>::new(),
-                DeadZone::default(),
-                Bindings::spawn((
-                    Cardinal::wasd_keys(),
-                    Axial::left_stick(),
-                )),
-            ),
-            (
-                Action::<Attack>::new(),
-                Press::default(),
-                bindings![KeyCode::Space, GamepadButton::West],
-            ),
-        ]));
+    commands.entity(trigger.entity).insert(actions!(Player[
+        (
+            Action::<Move>::new(),
+            DeadZone::default(),
+            Bindings::spawn((
+                Cardinal::wasd_keys(),
+                Axial::left_stick(),
+            )),
+        ),
+        (
+            Action::<Attack>::new(),
+            Press::default(),
+            bindings![KeyCode::Space, GamepadButton::West, MouseButton::Left],
+        ),
+    ]));
 }
 
 #[derive(InputAction)]
