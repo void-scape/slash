@@ -45,7 +45,6 @@ fn hit_event(
     attacker: Query<&Hitbox>,
     weapons: AncestorQuery<Entity, With<Weapon>>,
 ) -> Result {
-    println!("HI");
     if target.get(start.collider1).is_ok() && attacker.get(start.collider2).is_ok() {
         let weapon = weapons.get(start.collider2)?;
         commands.entity(start.collider1).trigger(|target| HitEvent {

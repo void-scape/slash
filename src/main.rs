@@ -52,6 +52,9 @@ fn main() {
     ))
     .insert_resource(Gravity(Vec2::ZERO));
 
+    #[cfg(not(feature = "debug"))]
+    app.set_error_handler(bevy::ecs::error::warn);
+
     // the defalt schedule for Avian is `FixedPostUpdate`, but I wanted something easier to type,
     // so it is set to `Avian`
     app.world_mut()

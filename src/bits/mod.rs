@@ -1,25 +1,32 @@
-use avian2d::prelude::{LinearDamping, LinearVelocity, RigidBody};
+use crate::weapon::HitEvent;
+use avian2d::prelude::{CollisionEventsEnabled, LinearDamping, LinearVelocity, RigidBody};
 use bevy::{color::palettes::css::GREEN, prelude::*};
 use rand::Rng;
 use std::f32::consts::PI;
-use crate::weapon::HitEvent;
+
+pub mod coalescence;
 
 pub struct BitsPlugin;
 
 impl Plugin for BitsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(observe_bits);
+        app.add_plugins(coalescence::CoalescencePlugin)
+            .add_observer(observe_hit);
     }
 }
 
 const BITS_SPEED: f32 = 500f32;
+const INITIAL_SIZE: f32 = 8f32;
 
 #[derive(Component)]
 #[require(
+    coalescence::BitMass(1.0),
+    coalescence::CoalesceTimer,
     Transform,
     LinearDamping(4.0),
     RigidBody::Dynamic,
-    Sprite::from_color(GREEN, Vec2::new(8.0, 8.0))
+    CollisionEventsEnabled,
+    Sprite::from_color(GREEN, Vec2::splat(INITIAL_SIZE))
 )]
 pub struct Bit;
 
@@ -27,7 +34,7 @@ pub struct Bit;
 #[derive(Component)]
 pub struct BitProducer(pub usize);
 
-fn observe_bits(
+fn observe_hit(
     trigger: On<HitEvent>,
     transforms: Query<&GlobalTransform>,
     weapon: Query<&BitProducer>,
