@@ -22,12 +22,12 @@ impl Plugin for CoalescencePlugin {
     }
 }
 
-const MASS_THRESOLD: f32 = 5.0;
+const MASS_THRESOLD: f32 = 30.0;
 
 /// Fired when a bit exceeds the mass threshold.
 #[derive(EntityEvent)]
 pub struct CoalesceEvent {
-    entity: Entity,
+    pub entity: Entity,
 }
 
 /// We'll wait a moment to start checking for coalescence.

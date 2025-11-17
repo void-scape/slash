@@ -55,7 +55,7 @@ fn main() {
     ))
     .insert_resource(Gravity(Vec2::ZERO));
 
-    #[cfg(not(feature = "debug"))]
+    // #[cfg(not(feature = "debug"))]
     app.set_error_handler(bevy::ecs::error::warn);
 
     // the defalt schedule for Avian is `FixedPostUpdate`, but I wanted something easier to type,
@@ -97,7 +97,7 @@ fn spawn_scene(mut commands: Commands) {
             Player,
             health::Health::new(10.0),
             children![
-                (weapon::Axe, bits::BitProducer(50)),
+                (weapon::Axe, bits::BitProducer(35)),
                 (
                     health::FriendlyHurtbox,
                     avian2d::prelude::Collider::rectangle(15.0, 15.0),
