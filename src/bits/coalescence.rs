@@ -1,4 +1,4 @@
-use crate::{Avian, bits::INITIAL_SIZE};
+use crate::Avian;
 use avian2d::prelude::*;
 use bevy::{ecs::entity::EntityHashSet, prelude::*};
 use std::time::Duration;
@@ -52,8 +52,7 @@ impl CoalesceTimer {
             if timer.0.tick(delta).just_finished() {
                 commands
                     .entity(entity)
-                    .remove::<CoalesceTimer>()
-                    .insert((Sensor, Collider::rectangle(INITIAL_SIZE, INITIAL_SIZE)));
+                    .remove::<(CoalesceTimer, ColliderDisabled)>();
             }
         }
     }
@@ -94,8 +93,13 @@ impl BitMass {
 #[derive(Component, Default)]
 struct TempMass(f32);
 
-fn coalesce(bits: Query<(Entity, &BitMass)>, collisions: Collisions, mut commands: Commands) {
-    let mut has_coalesced = EntityHashSet::default();
+fn coalesce(
+    bits: Query<(Entity, &BitMass)>,
+    collisions: Collisions,
+    mut commands: Commands,
+    mut has_coalesced: Local<EntityHashSet>,
+) {
+    has_coalesced.clear();
     for (bit, &BitMass(mass)) in &bits {
         if has_coalesced.contains(&bit) {
             continue;

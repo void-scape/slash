@@ -71,7 +71,7 @@ impl FriendlyHurtbox {
 pub struct FriendlyHitbox;
 
 impl FriendlyHitbox {
-    fn collision_layers() -> CollisionLayers {
+    pub fn collision_layers() -> CollisionLayers {
         CollisionLayers::new(
             Layer::FriendlyHitboxEnemyHurtbox,
             Layer::FriendlyHitboxEnemyHurtbox,

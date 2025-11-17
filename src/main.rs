@@ -5,7 +5,7 @@ use avian2d::prelude::Gravity;
 use bevy::{app::FixedMainScheduleOrder, ecs::schedule::ScheduleLabel, prelude::*};
 use player::Player;
 
-use crate::enemy::steering::SteeringTarget;
+use crate::{enemy::steering::SteeringTarget, weapon::WeaponPickup};
 #[cfg(feature = "debug")]
 use bevy::input::common_conditions::input_toggle_active;
 
@@ -92,12 +92,14 @@ fn camera(mut commands: Commands) {
 }
 
 fn spawn_scene(mut commands: Commands) {
+    commands.spawn((WeaponPickup::default(), weapon::Broadsword));
+
     let player = commands
         .spawn((
             Player,
             health::Health::new(10.0),
             children![
-                (weapon::Axe, bits::BitProducer(35)),
+                (weapon::Dagger, bits::BitProducer(35)),
                 (
                     health::FriendlyHurtbox,
                     avian2d::prelude::Collider::rectangle(15.0, 15.0),

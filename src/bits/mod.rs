@@ -4,7 +4,7 @@ use crate::{
     player::Player,
     weapon::{Dagger, HitEvent},
 };
-use avian2d::prelude::{CollisionEventsEnabled, LinearDamping, LinearVelocity, RigidBody};
+use avian2d::prelude::*;
 use bevy::{color::palettes::css::GREEN, prelude::*};
 use rand::Rng;
 use std::f32::consts::PI;
@@ -55,10 +55,11 @@ fn spawn_enemy(
 #[require(
     coalescence::BitMass(1.0),
     coalescence::CoalesceTimer,
-    Transform,
-    LinearDamping(4.0),
     RigidBody::Dynamic,
+    Collider = Collider::rectangle(INITIAL_SIZE, INITIAL_SIZE),
     CollisionEventsEnabled,
+    LinearDamping(4.0),
+    ColliderDisabled,
     Sprite::from_color(GREEN, Vec2::splat(INITIAL_SIZE))
 )]
 pub struct Bit;

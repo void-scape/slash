@@ -14,6 +14,7 @@ pub fn plugin(app: &mut App) {
             weapon_orientation,
             attack_duration,
             attack_cooldown,
+            (finish_throw, remove_weapon_rigidbody).chain(),
         ),
     )
     .add_observer(propogate_trigger_weapon)
@@ -61,15 +62,31 @@ pub struct Axe;
 
 // COMPONENTS AND SYSTEMS
 
+/// Weapon pickup radius.
+#[derive(Component)]
+pub struct WeaponPickup(pub f32);
+
+impl Default for WeaponPickup {
+    fn default() -> Self {
+        WeaponPickup(50.0)
+    }
+}
+
 /// The seperation between the root transform and the middle of the
 /// weapon transform.
 #[derive(Component)]
 pub struct WeaponReach(pub f32);
 
-fn weapon_orientation(mut weapons: Query<(&mut Transform, &WeaponReach), Changed<WeaponReach>>) {
+fn weapon_orientation(
+    mut weapons: Query<
+        (&mut Transform, &WeaponReach),
+        (With<ChildOf>, Or<(Changed<WeaponReach>, Added<ChildOf>)>),
+    >,
+) {
     for (mut transform, reach) in weapons.iter_mut() {
         transform.translation.x = 0.0;
         transform.translation.y = reach.0;
+        transform.rotation = Quat::default();
     }
 }
 
@@ -107,7 +124,7 @@ fn hit_event(
     weapons: AncestorQuery<Entity, With<Weapon>>,
 ) -> Result {
     if target.get(start.collider1).is_ok() && attacker.get(start.collider2).is_ok() {
-        let weapon = weapons.get(start.collider2)?;
+        let weapon = weapons.get_inclusive(start.collider2)?;
         commands.entity(start.collider1).trigger(|target| HitEvent {
             target,
             attacker: start.collider2,
@@ -236,6 +253,32 @@ fn trigger_weapon(
                 collider.clone(),
                 Transform::default(),
             ));
+        }
+    }
+}
+
+fn finish_throw(mut commands: Commands, weapons: Query<(Entity, &LinearVelocity), With<Weapon>>) {
+    for (entity, velocity) in weapons.iter() {
+        if velocity.0.length_squared() < 10.0 * 10.0 {
+            commands
+                .entity(entity)
+                .remove::<(Hitbox, FriendlyHitbox, EnemyHitbox)>()
+                .insert((
+                    ColliderDisabled,
+                    WeaponPickup::default(),
+                    CollisionLayers::NONE,
+                ));
+        }
+    }
+}
+
+fn remove_weapon_rigidbody(
+    mut commands: Commands,
+    weapons: Query<(Entity, &LinearVelocity), With<Weapon>>,
+) {
+    for (entity, velocity) in weapons.iter() {
+        if velocity.0.length_squared() < f32::EPSILON * f32::EPSILON {
+            commands.entity(entity).remove::<RigidBody>();
         }
     }
 }
