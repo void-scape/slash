@@ -166,18 +166,22 @@ fn trigger_weapon(
             0.0
         };
 
-        let mut entity = commands.spawn((
-            ChildOf(trigger.entity),
-            duration.clone(),
-            FriendlyHitbox,
-            collider.clone(),
-            Transform::from_rotation(Quat::from_rotation_z(angle)),
-        ));
-
         if trigger.friendly {
-            entity.insert(FriendlyHitbox);
+            commands.spawn((
+                ChildOf(trigger.entity),
+                FriendlyHitbox,
+                duration.clone(),
+                collider.clone(),
+                Transform::from_rotation(Quat::from_rotation_z(angle)),
+            ));
         } else {
-            entity.insert(EnemyHitbox);
+            commands.spawn((
+                ChildOf(trigger.entity),
+                EnemyHitbox,
+                duration.clone(),
+                collider.clone(),
+                Transform::from_rotation(Quat::from_rotation_z(angle)),
+            ));
         }
     }
 }

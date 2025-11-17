@@ -45,7 +45,7 @@ where
     R: Relationship,
 {
     pub fn get(&self, target: Entity) -> Result<ROQueryItem<'_, 's, D>, AncestorQueryError> {
-        for ancestor in std::iter::once(target).chain(self.ancestors.iter_ancestors(target)) {
+        for ancestor in self.ancestors.iter_ancestors(target) {
             if let Ok(data) = self.query.get(ancestor) {
                 return Ok(data);
             }
@@ -55,6 +55,40 @@ where
     }
 
     pub fn get_mut(&mut self, target: Entity) -> Result<D::Item<'_, 's>, AncestorQueryError> {
+        let mut target_ancestor = None;
+        for ancestor in self.ancestors.iter_ancestors(target) {
+            if self.query.contains(ancestor) {
+                target_ancestor = Some(ancestor);
+                break;
+            }
+        }
+
+        match target_ancestor {
+            Some(ancestor) => self
+                .query
+                .get_mut(ancestor)
+                .map_err(AncestorQueryError::Query),
+            None => Err(AncestorQueryError::NoMatchingEntity),
+        }
+    }
+
+    pub fn get_inclusive(
+        &self,
+        target: Entity,
+    ) -> Result<ROQueryItem<'_, 's, D>, AncestorQueryError> {
+        for ancestor in std::iter::once(target).chain(self.ancestors.iter_ancestors(target)) {
+            if let Ok(data) = self.query.get(ancestor) {
+                return Ok(data);
+            }
+        }
+
+        Err(AncestorQueryError::NoMatchingEntity)
+    }
+
+    pub fn get_inclusive_mut(
+        &mut self,
+        target: Entity,
+    ) -> Result<D::Item<'_, 's>, AncestorQueryError> {
         let mut target_ancestor = None;
         for ancestor in std::iter::once(target).chain(self.ancestors.iter_ancestors(target)) {
             if self.query.contains(ancestor) {

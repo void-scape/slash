@@ -90,7 +90,18 @@ fn camera(mut commands: Commands) {
 
 fn spawn_scene(mut commands: Commands) {
     let player = commands
-        .spawn((Player, children![(weapon::Dagger, bits::BitProducer(50))]))
+        .spawn((
+            Player,
+            health::Health::new(10.0),
+            children![
+                (weapon::Dagger, bits::BitProducer(50)),
+                (
+                    health::FriendlyHurtbox,
+                    avian2d::prelude::Collider::rectangle(100.0, 100.0),
+                    Transform::default(),
+                )
+            ],
+        ))
         .id();
 
     commands.spawn((
@@ -98,10 +109,13 @@ fn spawn_scene(mut commands: Commands) {
         SteeringTarget(player),
         Transform::from_translation(Vec3::new(300.0, 300.0, 0.0)),
         health::Health::new(4.0),
-        children![(
-            health::EnemyHurtbox,
-            avian2d::prelude::Collider::rectangle(100.0, 100.0),
-            Transform::default(),
-        )],
+        children![
+            (
+                health::EnemyHurtbox,
+                avian2d::prelude::Collider::rectangle(100.0, 100.0),
+                Transform::default(),
+            ),
+            weapon::Dagger
+        ],
     ));
 }

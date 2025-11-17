@@ -40,7 +40,9 @@ fn observe_hit(
     weapon: Query<&BitProducer>,
     mut commands: Commands,
 ) -> Result {
-    let bit_producer = weapon.get(trigger.weapon)?;
+    let Ok(bit_producer) = weapon.get(trigger.weapon) else {
+        return Ok(());
+    };
     let attacker_trans = transforms.get(trigger.attacker)?.compute_transform();
     let target_trans = transforms.get(trigger.target)?.compute_transform();
 
