@@ -15,6 +15,6 @@ impl Plugin for EnemyPlugin {
 #[require(
     Transform,
     RigidBody::Dynamic,
-    Sprite::from_color(RED, Vec2::new(50.0, 50.0))
+    Sprite::from_color(RED, Vec2::new(20.0, 20.0))
 )]
 pub struct Enemy;

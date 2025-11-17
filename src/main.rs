@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
+use avian2d::prelude::Gravity;
 use bevy::{app::FixedMainScheduleOrder, ecs::schedule::ScheduleLabel, prelude::*};
 use player::Player;
 
@@ -38,7 +39,8 @@ fn main() {
         player::PlayerPlugin,
         enemy::EnemyPlugin,
         bits::BitsPlugin,
-    ));
+    ))
+    .insert_resource(Gravity(Vec2::ZERO));
 
     // the defalt schedule for Avian is `FixedPostUpdate`, but I wanted something easier to type,
     // so it is set to `Avian`

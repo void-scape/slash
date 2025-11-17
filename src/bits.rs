@@ -1,7 +1,7 @@
-use avian2d::prelude::{LinearVelocity, RigidBody};
+use avian2d::prelude::{LinearDamping, LinearVelocity, RigidBody};
 use bevy::{color::palettes::css::GREEN, prelude::*};
 use rand::Rng;
-use std::f32::consts::FRAC_PI_2;
+use std::f32::consts::PI;
 
 pub struct BitsPlugin;
 
@@ -11,11 +11,14 @@ impl Plugin for BitsPlugin {
     }
 }
 
+const BITS_SPEED: f32 = 500f32;
+
 #[derive(Component)]
 #[require(
     Transform,
+    LinearDamping(4.0),
     RigidBody::Dynamic,
-    Sprite::from_color(GREEN, Vec2::new(20.0, 20.0))
+    Sprite::from_color(GREEN, Vec2::new(8.0, 8.0))
 )]
 pub struct Bit;
 
@@ -45,12 +48,12 @@ fn observe_bits(
     let mut rng = rand::rng();
 
     for _ in 0..bit_producer.0 {
-        let direction = random_direction_in_arc(direction.xy(), FRAC_PI_2, &mut rng);
+        let direction = random_direction_in_arc(direction.xy(), PI * 0.75, &mut rng);
 
         commands.spawn((
             Bit,
             Transform::from_translation(target_trans.translation),
-            LinearVelocity(direction * 100.0),
+            LinearVelocity(direction * BITS_SPEED * rng.random_range(0.8..1.2)),
         ));
     }
 
