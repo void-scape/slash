@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_enhanced_input::prelude::*;
 
 use super::Player;
+use crate::weapon::TriggerWeapon;
 
 pub struct InputPlugin;
 
@@ -15,21 +16,23 @@ impl Plugin for InputPlugin {
 }
 
 fn inject_bindings(trigger: On<Insert, Player>, mut commands: Commands) {
-    commands.entity(trigger.entity).insert(actions!(Player[
-        (
-            Action::<Move>::new(),
-            DeadZone::default(),
-            Bindings::spawn((
-                Cardinal::wasd_keys(),
-                Axial::left_stick(),
-            )),
-        ),
-        (
-            Action::<Attack>::new(),
-            Press::default(),
-            bindings![KeyCode::Space, GamepadButton::West],
-        ),
-    ]));
+    commands
+        .entity(trigger.entity)
+        .insert(actions!(Player[
+            (
+                Action::<Move>::new(),
+                DeadZone::default(),
+                Bindings::spawn((
+                    Cardinal::wasd_keys(),
+                    Axial::left_stick(),
+                )),
+            ),
+            (
+                Action::<Attack>::new(),
+                Press::default(),
+                bindings![KeyCode::Space, GamepadButton::West],
+            ),
+        ]));
 }
 
 #[derive(InputAction)]
@@ -46,15 +49,8 @@ struct Attack;
 
 fn handle_attack(
     _attack: On<Fire<Attack>>,
-    player: Single<Entity, With<Player>>,
-    enemy: Single<Entity, With<crate::enemy::Enemy>>,
     mut commands: Commands,
+    player: Single<Entity, With<Player>>,
 ) {
-    let weapon = commands.spawn(crate::bits::BitProducer(50)).id();
-
-    commands.trigger(crate::bits::BitsEvent {
-        target: *enemy,
-        attacker: *player,
-        weapon,
-    });
+    commands.entity(*player).trigger(TriggerWeapon::friendly);
 }

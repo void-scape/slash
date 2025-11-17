@@ -2,6 +2,7 @@ use avian2d::prelude::{LinearDamping, LinearVelocity, RigidBody};
 use bevy::{color::palettes::css::GREEN, prelude::*};
 use rand::Rng;
 use std::f32::consts::PI;
+use crate::weapon::HitEvent;
 
 pub struct BitsPlugin;
 
@@ -22,20 +23,12 @@ const BITS_SPEED: f32 = 500f32;
 )]
 pub struct Bit;
 
-#[derive(EntityEvent)]
-pub struct BitsEvent {
-    #[event_target]
-    pub target: Entity,
-    pub weapon: Entity,
-    pub attacker: Entity,
-}
-
 /// Describes the number of bits an attack will produce.
 #[derive(Component)]
 pub struct BitProducer(pub usize);
 
 fn observe_bits(
-    trigger: On<BitsEvent>,
+    trigger: On<HitEvent>,
     transforms: Query<&GlobalTransform>,
     weapon: Query<&BitProducer>,
     mut commands: Commands,

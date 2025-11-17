@@ -12,5 +12,9 @@ impl Plugin for PlayerPlugin {
 
 /// The player marker component.
 #[derive(Component)]
-#[require(Transform, Sprite::from_color(BLUE, Vec2::new(20.0, 20.0)))]
+#[require(
+    Transform,
+    Sprite::from_color(BLUE, Vec2::new(20.0, 20.0)),
+    Name::new("Player")
+)]
 pub struct Player;

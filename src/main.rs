@@ -9,7 +9,10 @@ use crate::enemy::steering::SteeringTarget;
 
 mod bits;
 mod enemy;
+mod health;
 mod player;
+mod query;
+mod weapon;
 
 pub const WIDTH: f32 = 1280.0;
 pub const HEIGHT: f32 = 720.0;
@@ -30,6 +33,11 @@ fn main() {
         bevy_rand::prelude::EntropyPlugin::<bevy_rand::prelude::WyRand>::with_seed(
             69u64.to_le_bytes(),
         ),
+        #[cfg(feature = "debug")]
+        (
+            bevy_inspector_egui::bevy_egui::EguiPlugin::default(),
+            bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
+        ),
     ))
     .add_plugins((
         avian2d::PhysicsPlugins::default().with_length_unit(2.0),
@@ -39,6 +47,8 @@ fn main() {
         player::PlayerPlugin,
         enemy::EnemyPlugin,
         bits::BitsPlugin,
+        health::plugin,
+        weapon::plugin,
     ))
     .insert_resource(Gravity(Vec2::ZERO));
 
@@ -76,11 +86,19 @@ fn camera(mut commands: Commands) {
 }
 
 fn spawn_scene(mut commands: Commands) {
-    let player = commands.spawn(Player).id();
+    let player = commands
+        .spawn((Player, children![(weapon::Dagger, bits::BitProducer(50))]))
+        .id();
 
     commands.spawn((
         enemy::Enemy,
         SteeringTarget(player),
         Transform::from_translation(Vec3::new(300.0, 300.0, 0.0)),
+        health::Health::new(4.0),
+        children![(
+            health::EnemyHurtbox,
+            avian2d::prelude::Collider::rectangle(100.0, 100.0),
+            Transform::default(),
+        )],
     ));
 }
