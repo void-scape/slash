@@ -7,17 +7,14 @@ pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(steering::SteeringPlugin)
-            .add_observer(inject_sprite);
+        app.add_plugins(steering::SteeringPlugin);
     }
 }
 
 #[derive(Component)]
-#[require(Transform, RigidBody::Dynamic)]
+#[require(
+    Transform,
+    RigidBody::Dynamic,
+    Sprite::from_color(RED, Vec2::new(50.0, 50.0))
+)]
 pub struct Enemy;
-
-fn inject_sprite(trigger: On<Insert, Enemy>, mut commands: Commands) {
-    commands
-        .entity(trigger.entity)
-        .insert(Sprite::from_color(RED, Vec2::new(50.0, 50.0)));
-}

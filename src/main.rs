@@ -6,6 +6,7 @@ use player::Player;
 
 use crate::enemy::steering::SteeringTarget;
 
+mod bits;
 mod enemy;
 mod player;
 
@@ -36,6 +37,7 @@ fn main() {
         bevy_enhanced_input::EnhancedInputPlugin,
         player::PlayerPlugin,
         enemy::EnemyPlugin,
+        bits::BitsPlugin,
     ));
 
     // the defalt schedule for Avian is `FixedPostUpdate`, but I wanted something easier to type,
