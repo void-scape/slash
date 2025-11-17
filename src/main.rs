@@ -1,10 +1,12 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
-use bevy::prelude::*;
+use bevy::{app::FixedMainScheduleOrder, ecs::schedule::ScheduleLabel, prelude::*};
 use player::Player;
 
-mod input;
+use crate::enemy::steering::SteeringTarget;
+
+mod enemy;
 mod player;
 
 pub const WIDTH: f32 = 1280.0;
@@ -33,13 +35,23 @@ fn main() {
         avian2d::debug_render::PhysicsDebugPlugin,
         bevy_enhanced_input::EnhancedInputPlugin,
         player::PlayerPlugin,
+        enemy::EnemyPlugin,
     ));
+
+    // the defalt schedule for Avian is `FixedPostUpdate`, but I wanted something easier to type,
+    // so it is set to `Avian`
+    app.world_mut()
+        .resource_mut::<FixedMainScheduleOrder>()
+        .insert_after(FixedPostUpdate, Avian);
 
     #[cfg(debug_assertions)]
     app.add_systems(Update, close_on_escape);
 
-    app.add_systems(Startup, (camera, spawn_player)).run();
+    app.add_systems(Startup, (camera, spawn_scene)).run();
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct Avian;
 
 #[cfg(debug_assertions)]
 fn close_on_escape(input: Res<ButtonInput<KeyCode>>, mut writer: MessageWriter<AppExit>) {
@@ -59,6 +71,12 @@ fn camera(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
 
-fn spawn_player(mut commands: Commands) {
-    commands.spawn(Player);
+fn spawn_scene(mut commands: Commands) {
+    let player = commands.spawn(Player).id();
+
+    commands.spawn((
+        enemy::Enemy,
+        SteeringTarget(player),
+        Transform::from_translation(Vec3::new(300.0, 300.0, 0.0)),
+    ));
 }

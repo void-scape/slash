@@ -1,4 +1,4 @@
-use bevy::{color::palettes::css::RED, prelude::*};
+use bevy::{color::palettes::css::BLUE, prelude::*};
 
 pub mod input;
 
@@ -19,5 +19,5 @@ pub struct Player;
 fn inject_sprite(trigger: On<Insert, Player>, mut commands: Commands) {
     commands
         .entity(trigger.entity)
-        .insert(Sprite::from_color(RED, Vec2::new(50.0, 50.0)));
+        .insert(Sprite::from_color(BLUE, Vec2::new(50.0, 50.0)));
 }
