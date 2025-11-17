@@ -30,7 +30,7 @@ fn attack(
     mut rng: Single<&mut WyRand, With<GlobalRng>>,
 ) {
     for entity in enemies.iter() {
-        if rng.random_bool(0.01) {
+        if rng.random_bool(0.02) {
             commands.entity(entity).trigger(TriggerWeapon::enemy);
         }
     }

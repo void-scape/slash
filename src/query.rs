@@ -38,6 +38,7 @@ impl core::fmt::Display for AncestorQueryError {
 
 impl core::error::Error for AncestorQueryError {}
 
+#[allow(unused)]
 impl<'w, 's, D, F, R> AncestorQuery<'w, 's, D, F, R>
 where
     D: QueryData + 'static,

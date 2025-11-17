@@ -7,10 +7,18 @@ use crate::{
 };
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Update, (attack_duration, attack_cooldown))
-        .add_observer(propogate_trigger_weapon)
-        .add_observer(trigger_weapon)
-        .add_observer(hit_event);
+    app.add_systems(
+        Update,
+        (
+            weapon_sprite,
+            weapon_orientation,
+            attack_duration,
+            attack_cooldown,
+        ),
+    )
+    .add_observer(propogate_trigger_weapon)
+    .add_observer(trigger_weapon)
+    .add_observer(hit_event);
 }
 
 // WEAPONS
@@ -19,13 +27,66 @@ pub fn plugin(app: &mut App) {
 #[require(
     Weapon,
     Damage(1.0),
+    WeaponReach(15.0),
     AttackDuration::from_seconds(0.1),
     AttackCooldown::from_seconds(0.2),
-    Collider::rectangle(50.0, 20.0)
+    Collider::rectangle(50.0, 20.0),
+    WeaponSprite("weapons/1.png")
 )]
 pub struct Dagger;
 
+#[derive(Component)]
+#[require(
+    Weapon,
+    Damage(1.5),
+    WeaponReach(25.0),
+    AttackDuration::from_seconds(0.2),
+    AttackCooldown::from_seconds(0.4),
+    Collider::rectangle(35.0, 55.0),
+    WeaponSprite("weapons/4.png")
+)]
+pub struct Broadsword;
+
+#[derive(Component)]
+#[require(
+    Weapon,
+    Damage(2.5),
+    WeaponReach(30.0),
+    AttackDuration::from_seconds(0.3),
+    AttackCooldown::from_seconds(1.0),
+    Collider::rectangle(60.0, 60.0),
+    WeaponSprite("weapons/7.png")
+)]
+pub struct Axe;
+
 // COMPONENTS AND SYSTEMS
+
+/// The seperation between the root transform and the middle of the
+/// weapon transform.
+#[derive(Component)]
+pub struct WeaponReach(pub f32);
+
+fn weapon_orientation(mut weapons: Query<(&mut Transform, &WeaponReach), Changed<WeaponReach>>) {
+    for (mut transform, reach) in weapons.iter_mut() {
+        transform.translation.x = 0.0;
+        transform.translation.y = reach.0;
+    }
+}
+
+#[derive(Component)]
+struct WeaponSprite(&'static str);
+
+fn weapon_sprite(
+    mut commands: Commands,
+    server: Res<AssetServer>,
+    weapon_sprites: Query<(Entity, &WeaponSprite), Added<WeaponSprite>>,
+) {
+    for (entity, sprite_path) in weapon_sprites.iter() {
+        commands
+            .entity(entity)
+            .insert(Sprite::from_image(server.load(sprite_path.0)));
+    }
+}
 
 #[derive(EntityEvent)]
 pub struct HitEvent {

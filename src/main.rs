@@ -97,7 +97,7 @@ fn spawn_scene(mut commands: Commands) {
             Player,
             health::Health::new(10.0),
             children![
-                (weapon::Dagger, bits::BitProducer(50)),
+                (weapon::Axe, bits::BitProducer(50)),
                 (
                     health::FriendlyHurtbox,
                     avian2d::prelude::Collider::rectangle(15.0, 15.0),
@@ -111,6 +111,21 @@ fn spawn_scene(mut commands: Commands) {
         enemy::Enemy,
         SteeringTarget(player),
         Transform::from_translation(Vec3::new(300.0, 300.0, 0.0)),
+        health::Health::new(4.0),
+        children![
+            (
+                health::EnemyHurtbox,
+                avian2d::prelude::Collider::rectangle(25.0, 25.0),
+                Transform::default(),
+            ),
+            (weapon::Broadsword, Transform::from_xyz(0.0, 15.0, 0.0))
+        ],
+    ));
+
+    commands.spawn((
+        enemy::Enemy,
+        SteeringTarget(player),
+        Transform::from_translation(Vec3::new(100.0, 100.0, 0.0)),
         health::Health::new(4.0),
         children![
             (

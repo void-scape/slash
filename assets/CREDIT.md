@@ -1,0 +1,1 @@
+- weapons: https://ansimuz.itch.io/fantasy-weapons-set
