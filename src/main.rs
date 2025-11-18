@@ -12,6 +12,8 @@ use player::Player;
 use crate::{
     bits::coalescence::{Absorber, CoalesceEvent, EnemyAbsorber},
     health::Health,
+    player::PlayerHurtbox,
+    weapon::WeaponDurability,
 };
 #[cfg(feature = "debug")]
 use bevy::input::common_conditions::input_toggle_active;
@@ -19,6 +21,7 @@ use bevy::input::common_conditions::input_toggle_active;
 mod bits;
 mod enemy;
 mod health;
+mod physics;
 mod player;
 mod query;
 mod weapon;
@@ -48,6 +51,7 @@ fn main() {
         bevy_rand::prelude::EntropyPlugin::<bevy_rand::prelude::WyRand>::with_seed(
             69u64.to_le_bytes(),
         ),
+        bevy_tween::DefaultTweenPlugins,
         #[cfg(feature = "debug")]
         (
             bevy_inspector_egui::bevy_egui::EguiPlugin::default(),
@@ -65,6 +69,7 @@ fn main() {
         bits::BitsPlugin,
         health::plugin,
         weapon::plugin,
+        physics::plugin,
     ))
     .insert_resource(Gravity(Vec2::ZERO));
 
@@ -107,10 +112,16 @@ fn camera(mut commands: Commands) {
 fn spawn_scene(mut commands: Commands) {
     commands.spawn((
         Player,
+        Transform::from_xyz(0.0, -30.0, 0.0),
         health::Health::new(10.0),
         children![
-            (weapon::Pistol, bits::BitProducer(35)),
             (
+                weapon::Dagger,
+                WeaponDurability(100),
+                bits::BitProducer(35),
+            ),
+            (
+                PlayerHurtbox,
                 health::FriendlyHurtbox,
                 avian2d::prelude::Collider::rectangle(15.0, 15.0),
                 Transform::default(),
@@ -120,12 +131,17 @@ fn spawn_scene(mut commands: Commands) {
 
     commands
         .spawn(GlobalTransform::from(Transform::from_translation(
-            Vec3::new(50.0, 50.0, 0.0),
+            Vec3::new(100.0, 100.0, 0.0),
         )))
         .trigger(CoalesceEvent);
     commands
         .spawn(GlobalTransform::from(Transform::from_translation(
-            Vec3::new(-50.0, 50.0, 0.0),
+            Vec3::new(-100.0, 100.0, 0.0),
+        )))
+        .trigger(CoalesceEvent);
+    commands
+        .spawn(GlobalTransform::from(Transform::from_translation(
+            Vec3::new(0.0, 0.0, 0.0),
         )))
         .trigger(CoalesceEvent);
 

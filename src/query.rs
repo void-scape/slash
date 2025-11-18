@@ -73,6 +73,37 @@ where
         }
     }
 
+    pub fn get_last(&self, target: Entity) -> Result<ROQueryItem<'_, 's, D>, AncestorQueryError> {
+        let mut target_ancestor = None;
+        for ancestor in self.ancestors.iter_ancestors(target) {
+            if self.query.contains(ancestor) {
+                target_ancestor = Some(ancestor);
+            }
+        }
+
+        match target_ancestor {
+            Some(ancestor) => self.query.get(ancestor).map_err(AncestorQueryError::Query),
+            None => Err(AncestorQueryError::NoMatchingEntity),
+        }
+    }
+
+    pub fn get_last_mut(&mut self, target: Entity) -> Result<D::Item<'_, 's>, AncestorQueryError> {
+        let mut target_ancestor = None;
+        for ancestor in self.ancestors.iter_ancestors(target) {
+            if self.query.contains(ancestor) {
+                target_ancestor = Some(ancestor);
+            }
+        }
+
+        match target_ancestor {
+            Some(ancestor) => self
+                .query
+                .get_mut(ancestor)
+                .map_err(AncestorQueryError::Query),
+            None => Err(AncestorQueryError::NoMatchingEntity),
+        }
+    }
+
     pub fn get_inclusive(
         &self,
         target: Entity,

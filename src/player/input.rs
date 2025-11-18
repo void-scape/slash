@@ -3,22 +3,32 @@ use crate::{
     Layer,
     bits::BitProducer,
     health::FriendlyHitbox,
+    physics::{Acceleration, velocity},
     player::OrientationMethod,
+    player::PlayerHurtbox,
     weapon::{TriggerWeapon, Weapon, WeaponPickup},
 };
 use avian2d::prelude::*;
 use bevy::prelude::*;
 use bevy_enhanced_input::prelude::*;
+use bevy_tween::{
+    bevy_time_runner::TimeRunnerEnded,
+    prelude::{AnimationBuilderExt, EaseKind},
+    tween::IntoTarget,
+};
+use std::time::Duration;
 
 pub struct InputPlugin;
 
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.add_input_context::<Player>()
+            .add_systems(Update, end_dash)
             .add_observer(inject_bindings)
             .add_observer(apply_movement)
             .add_observer(stop_movement)
             .add_observer(handle_attack)
+            .add_observer(handle_dash)
             .add_observer(handle_pick_up)
             .add_observer(handle_throw)
             .add_observer(handle_aim);
@@ -53,6 +63,11 @@ fn inject_bindings(trigger: On<Insert, Player>, mut commands: Commands) {
             bindings![KeyCode::Space, GamepadButton::West, GamepadButton::RightTrigger2, MouseButton::Left],
         ),
         (
+            Action::<Dash>::new(),
+            Press::default(),
+            bindings![KeyCode::ShiftLeft, GamepadButton::East],
+        ),
+        (
             Action::<PickUp>::new(),
             Press::default(),
             bindings![KeyCode::KeyE, GamepadButton::South],
@@ -69,15 +84,37 @@ fn inject_bindings(trigger: On<Insert, Player>, mut commands: Commands) {
 #[action_output(Vec2)]
 struct Move;
 
-fn apply_movement(movement: On<Fire<Move>>, mut player: Single<&mut LinearVelocity, With<Player>>) {
-    player.0 = movement.value * 200.0;
+#[derive(Default, Component)]
+pub struct RetainedMove(Vec2);
+
+fn apply_movement(
+    movement: On<Fire<Move>>,
+    player: Single<
+        (
+            &mut RetainedMove,
+            &mut LinearVelocity,
+            &MaxLinearSpeed,
+            &Acceleration,
+        ),
+        With<Player>,
+    >,
+    is_dashing: Query<&Dashing>,
+) {
+    let (mut retained, mut velocity, max_speed, acceleration) = player.into_inner();
+    retained.0 = movement.value;
+    if is_dashing.is_empty() && acceleration.0.length_squared() <= 20.0 * 20.0 {
+        velocity.0 = movement.value * max_speed.0;
+    }
 }
 
 fn stop_movement(
     _movement: On<Complete<Move>>,
     mut player: Single<&mut LinearVelocity, With<Player>>,
+    is_dashing: Query<&Dashing>,
 ) {
-    player.0 = Vec2::ZERO;
+    if is_dashing.is_empty() {
+        player.0 = Vec2::ZERO;
+    }
 }
 
 #[derive(InputAction)]
@@ -90,6 +127,60 @@ fn handle_attack(
     player: Single<Entity, With<Player>>,
 ) {
     commands.entity(*player).trigger(TriggerWeapon::friendly);
+}
+
+#[derive(InputAction)]
+#[action_output(bool)]
+struct Dash;
+
+#[derive(Component)]
+pub struct Dashing;
+
+fn handle_dash(
+    _dash: On<Fire<Dash>>,
+    mut commands: Commands,
+    player: Single<(Entity, &RetainedMove)>,
+    hurtbox: Single<Entity, With<PlayerHurtbox>>,
+) {
+    let (player_entity, last_input) = player.into_inner();
+    let start = last_input.0 * 4_000.0;
+    let end = Vec2::ZERO;
+
+    let animation = commands
+        .animation()
+        .insert_tween_here(
+            Duration::from_secs_f32(0.2),
+            EaseKind::QuarticOut,
+            player_entity.into_target().with(velocity(start, end)),
+        )
+        .insert(Dashing)
+        .id();
+
+    commands
+        .entity(player_entity)
+        .remove::<(Acceleration, LinearDamping, MaxLinearSpeed)>()
+        .add_child(animation);
+    commands.entity(*hurtbox).insert(ColliderDisabled);
+}
+
+fn end_dash(
+    mut commands: Commands,
+    dashing: Query<&Dashing>,
+    mut ended: MessageReader<TimeRunnerEnded>,
+    player: Single<Entity, With<Player>>,
+    hurtbox: Single<Entity, With<PlayerHurtbox>>,
+) {
+    for ended in ended.read() {
+        if ended.is_completed() && dashing.contains(ended.entity) {
+            commands.entity(ended.entity).despawn();
+            commands.entity(*player).insert((
+                Acceleration::default(),
+                Player::LINEAR_DAMPING,
+                Player::MAX_SPEED,
+            ));
+            commands.entity(*hurtbox).remove::<ColliderDisabled>();
+        }
+    }
 }
 
 #[derive(InputAction)]

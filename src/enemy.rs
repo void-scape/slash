@@ -1,12 +1,14 @@
 use crate::{
     Layer,
     bits::coalescence::CoalesceEvent,
-    enemy::steering::SteerTarget,
     health::{DeathEvent, DeathSystems, EnemyHurtbox, Health},
+    physics::{Acceleration, CustomPhysicsSystems},
     player::Player,
     weapon::{Broadsword, Dagger, Pistol, TriggerWeapon, Weapon, WeaponPickup, WeaponReach},
 };
-use avian2d::prelude::{Collider, ColliderOf, CollisionLayers, LockedAxes, RigidBody};
+use avian2d::prelude::{
+    Collider, ColliderOf, CollisionLayers, LockedAxes, MaxLinearSpeed, RigidBody,
+};
 use bevy::{
     color::palettes::css::{BLUE, GREEN, RED},
     prelude::*,
@@ -14,19 +16,38 @@ use bevy::{
 use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::Rng;
 
-pub mod steering;
-
 pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(steering::SteeringPlugin)
-            .add_systems(Update, attack)
+        app.add_systems(Update, (orient_to_player, attack))
             .add_systems(
                 FixedPostUpdate,
-                drop_weapon_on_death.in_set(DeathSystems::Prepare),
+                (
+                    drop_weapon_on_death.in_set(DeathSystems::Prepare),
+                    ((target_vector, seperation_vector), apply_force_vectors)
+                        .chain()
+                        .before(CustomPhysicsSystems::Acceleration),
+                ),
             )
             .add_observer(spawn_enemy);
+    }
+}
+
+#[derive(Component)]
+#[require(
+    Transform,
+    RigidBody::Dynamic,
+    Name::new("Enemy"),
+    CollisionLayers = Self::collision_layers(),
+    LockedAxes::ROTATION_LOCKED,
+    MaxLinearSpeed(40.0)
+)]
+pub struct Enemy;
+
+impl Enemy {
+    fn collision_layers() -> CollisionLayers {
+        CollisionLayers::new(Layer::Empty, Layer::Wall)
     }
 }
 
@@ -37,7 +58,6 @@ fn spawn_enemy(
     player: Query<Entity, With<Player>>,
     mut rng: Single<&mut WyRand, With<GlobalRng>>,
 ) -> Result {
-    // commands.entity(gibblet.0).despawn();
     let transform = transforms.get(gibblet.0)?;
     let mut entity = commands.spawn((
         Enemy,
@@ -103,22 +123,6 @@ fn sample_enemy_type(mut entity: EntityCommands, rng: &mut impl Rng) {
     }
 }
 
-#[derive(Component)]
-#[require(
-    Transform,
-    RigidBody::Dynamic,
-    Name::new("Enemy"),
-    CollisionLayers = Self::collision_layers(),
-    LockedAxes::ROTATION_LOCKED,
-)]
-pub struct Enemy;
-
-impl Enemy {
-    fn collision_layers() -> CollisionLayers {
-        CollisionLayers::new(Layer::Empty, Layer::Wall)
-    }
-}
-
 fn attack(
     mut commands: Commands,
     enemies: Query<Entity, With<Enemy>>,
@@ -151,4 +155,75 @@ fn drop_weapon_on_death(
         }
     }
     Ok(())
+}
+
+#[derive(Component)]
+#[require(Acceleration, TargetVector, SeperationVector)]
+pub struct SteerTarget(pub Entity);
+
+#[derive(Default, Component)]
+pub struct TargetVector(pub Vec2);
+
+#[derive(Default, Component)]
+pub struct SeperationVector(pub Vec2);
+
+fn target_vector(
+    mut steering: Query<(&mut TargetVector, &GlobalTransform, &SteerTarget)>,
+    targets: Query<&GlobalTransform>,
+) -> Result {
+    for (mut target_vector, gt, steer_target) in steering.iter_mut() {
+        if let Ok(target) = targets.get(steer_target.0) {
+            let diff = target.translation().xy() - gt.translation().xy();
+            let new_vector = diff.normalize_or_zero();
+            if new_vector != Vec2::ZERO {
+                target_vector.0 = new_vector;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn seperation_vector(
+    steering: Query<(Entity, &GlobalTransform), With<SeperationVector>>,
+    mut seperation_vectors: Query<&mut SeperationVector>,
+) -> Result {
+    let radius = 100.0;
+    let radius_squared = radius * radius;
+    for (target_entity, gt) in steering.iter() {
+        let target_translation = gt.translation().xy();
+        let mut seperation_force = Vec2::ZERO;
+        for (neighbor, neighbor_gt) in steering.iter() {
+            if neighbor == target_entity {
+                continue;
+            }
+            let neighbor_translation = neighbor_gt.translation().xy();
+            if target_translation.distance_squared(neighbor_translation) <= radius_squared {
+                let s = (target_translation - neighbor_translation).normalize_or_zero();
+                seperation_force += s;
+            }
+        }
+        let mut seperation_vector = seperation_vectors.get_mut(target_entity)?;
+        seperation_vector.0 = seperation_force.normalize_or_zero();
+    }
+    Ok(())
+}
+
+fn apply_force_vectors(mut steering: Query<(&mut Acceleration, &TargetVector, &SeperationVector)>) {
+    let impulse = 2.0;
+    for (mut acceleration, target, seperation) in steering.iter_mut() {
+        let force = target.0 * 2.0 + seperation.0 * 1.2;
+        acceleration.0 += force * impulse;
+    }
+}
+
+fn orient_to_player(
+    mut enemies: Query<&mut Transform, With<Enemy>>,
+    player: Single<&GlobalTransform, With<Player>>,
+) {
+    let player_translation = player.translation().xy();
+    for mut transform in enemies.iter_mut() {
+        let looking_at = player_translation - transform.translation.xy();
+        let angle = Vec2::Y.angle_to(looking_at.normalize_or(Vec2::Y));
+        transform.rotation = Quat::from_rotation_z(angle);
+    }
 }

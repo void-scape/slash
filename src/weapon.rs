@@ -7,7 +7,15 @@ use bevy::{
 use crate::{
     HEIGHT, WIDTH,
     health::{Damage, EnemyHitbox, FriendlyHitbox, Hitbox, Hurtbox},
+    physics::{Acceleration, acceleration},
+    query::AncestorQuery,
 };
+use bevy_tween::{
+    combinator::tween,
+    prelude::{AnimationBuilderExt, EaseKind},
+    tween::IntoTarget,
+};
+use std::time::Duration;
 
 pub fn plugin(app: &mut App) {
     app.add_message::<HitEvent>()
@@ -23,6 +31,12 @@ pub fn plugin(app: &mut App) {
             ),
         )
         .add_systems(PostUpdate, destroy_on_impact)
+        .add_systems(
+            FixedPostUpdate,
+            (weapon_knockback, weapon_durability)
+                .chain()
+                .in_set(PhysicsSystems::Last),
+        )
         .add_observer(propogate_trigger_weapon)
         .add_observer(trigger_weapon)
         .add_observer(hit_event);
@@ -92,11 +106,102 @@ pub struct Axe;
 // COMPONENTS AND SYSTEMS
 
 #[derive(Default, Component)]
-pub struct Melee;
+#[require(
+    Sensor,
+    Transform,
+    WeaponDurability,
+    WeaponKnockback,
+    LockedAxes::ROTATION_LOCKED,
+    // Disable the collider _ON_ the weapon. The weapon's collider should only
+    // be enabled when it is thrown by the player.
+    ColliderDisabled,
+)]
+#[cfg_attr(feature = "debug", require(DebugRender::none()))]
+#[component(on_insert = Self::insert)]
+pub struct Weapon;
+
+impl Weapon {
+    fn insert(mut world: DeferredWorld, ctx: HookContext) {
+        // Insert `AttackSource` into the weapon so that `hit_event` can find
+        // the weapon source when it collides with hurtboxes.
+        world
+            .commands()
+            .entity(ctx.entity)
+            .insert(AttackSource(ctx.entity));
+    }
+}
+
+/// Number of hits that a weapon can susatin before shattering.
+#[derive(Component)]
+pub struct WeaponDurability(pub usize);
+
+impl Default for WeaponDurability {
+    fn default() -> Self {
+        Self(3)
+    }
+}
+
+fn weapon_durability(
+    mut commands: Commands,
+    mut reader: MessageReader<HitEvent>,
+    mut weapons: Query<&mut WeaponDurability, With<Weapon>>,
+) -> Result {
+    for hit in reader.read() {
+        let mut durability = weapons.get_mut(hit.weapon)?;
+        durability.0 = durability.0.saturating_sub(1);
+        if durability.0 == 0 {
+            commands.entity(hit.weapon).despawn();
+        }
+    }
+    Ok(())
+}
 
 #[derive(Component)]
-pub struct Bullet;
+pub struct WeaponKnockback(pub f32);
 
+impl Default for WeaponKnockback {
+    fn default() -> Self {
+        Self(200.0)
+    }
+}
+
+fn weapon_knockback(
+    mut commands: Commands,
+    mut reader: MessageReader<HitEvent>,
+    transforms: Query<&GlobalTransform>,
+    accelerations: AncestorQuery<(Entity, &Acceleration)>,
+    knockback: Query<&WeaponKnockback>,
+) -> Result {
+    for hit in reader.read() {
+        let target_transform = transforms.get(hit.target)?;
+        let attacker_transform = transforms.get(hit.attacker)?;
+        let knockback = knockback.get(hit.weapon)?;
+
+        let (root_acceleration_entity, _) = accelerations.get_last(hit.target)?;
+        let diff = target_transform.translation().xy() - attacker_transform.translation().xy();
+
+        let start = diff.normalize_or(Vec2::Y) * knockback.0;
+        let end = Vec2::ZERO;
+        let animation = commands
+            .animation()
+            .insert(tween(
+                Duration::from_secs_f32(0.2),
+                EaseKind::Linear,
+                root_acceleration_entity
+                    .into_target()
+                    .with(acceleration(start, end)),
+            ))
+            .id();
+        commands.entity(hit.target).add_child(animation);
+    }
+    Ok(())
+}
+
+/// Melee weapons spawn hitboxes around the weapon.
+#[derive(Default, Component)]
+pub struct Melee;
+
+/// Bullet generator weapons spawn `Bullet`s.
 #[derive(Component)]
 pub struct BulletGenerator(Box<dyn FnMut(EntityCommands, LinearVelocity) + Send + Sync>);
 
@@ -108,7 +213,6 @@ impl BulletGenerator {
                 .insert((
                     Sprite::from_color(Color::WHITE, Vec2::splat(20.0)),
                     normalized_velocity,
-                    DestroyOnImpact,
                     Collider::circle(10.0),
                     LockedAxes::ROTATION_LOCKED,
                 ))
@@ -120,6 +224,10 @@ impl BulletGenerator {
     }
 }
 
+#[derive(Component)]
+pub struct Bullet;
+
+/// Despawns a hitbox on [`HitEvent`].
 #[derive(Component)]
 pub struct DestroyOnImpact;
 
@@ -212,25 +320,6 @@ fn hit_event(
         });
     }
     Ok(())
-}
-
-#[derive(Default, Component)]
-// Disable the collider _ON_ the weapon. `TriggerWeapon` will spawn a hitbox
-// and clone this collider.
-#[require(Transform, Sensor, ColliderDisabled, LockedAxes::ROTATION_LOCKED)]
-#[cfg_attr(feature = "debug", require(DebugRender::none()))]
-#[component(on_insert = Self::insert)]
-pub struct Weapon;
-
-impl Weapon {
-    fn insert(mut world: DeferredWorld, ctx: HookContext) {
-        // Insert `AttackSource` into the weapon so that `hit_event` can find
-        // the weapon source when it collides with hurtboxes.
-        world
-            .commands()
-            .entity(ctx.entity)
-            .insert(AttackSource(ctx.entity));
-    }
 }
 
 /// Points to the weapon that triggered this attack.

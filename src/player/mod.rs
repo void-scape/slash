@@ -1,5 +1,11 @@
-use crate::Layer;
-use avian2d::prelude::{Collider, CollisionLayers, LockedAxes, RigidBody};
+use crate::{
+    Layer,
+    physics::Acceleration,
+    player::input::{Dashing, RetainedMove},
+};
+use avian2d::prelude::{
+    Collider, CollisionLayers, LinearDamping, LockedAxes, MaxLinearSpeed, RigidBody,
+};
 use bevy::{
     color::palettes::css::BLUE, input::mouse::MouseMotion, prelude::*, window::PrimaryWindow,
 };
@@ -26,14 +32,23 @@ impl Plugin for PlayerPlugin {
     Collider::circle(7.5),
     LockedAxes::ROTATION_LOCKED,
     OrientationMethod,
+    Acceleration,
+    LinearDamping = Self::LINEAR_DAMPING,
+    MaxLinearSpeed = Self::MAX_SPEED,
+    RetainedMove,
 )]
 pub struct Player;
 
 impl Player {
-    fn collision_layers() -> CollisionLayers {
+    pub const LINEAR_DAMPING: LinearDamping = LinearDamping(100.0);
+    pub const MAX_SPEED: MaxLinearSpeed = MaxLinearSpeed(200.0);
+    pub fn collision_layers() -> CollisionLayers {
         CollisionLayers::new(Layer::Empty, Layer::Wall)
     }
 }
+
+#[derive(Component)]
+pub struct PlayerHurtbox;
 
 #[derive(Component, Default)]
 pub enum OrientationMethod {
@@ -47,9 +62,13 @@ fn orient_player_with_mouse_input(
     camera: Single<(&Camera, &GlobalTransform)>,
     player: Single<(&mut Transform, &mut OrientationMethod), With<Player>>,
     mut motion: MessageReader<MouseMotion>,
+    is_dashing: Query<&Dashing>,
 ) {
-    let (mut player_transform, mut orientation) = player.into_inner();
+    if !is_dashing.is_empty() {
+        return;
+    }
 
+    let (mut player_transform, mut orientation) = player.into_inner();
     if let OrientationMethod::Stick = *orientation {
         if motion.read().last().is_none() {
             *orientation = OrientationMethod::Mouse;

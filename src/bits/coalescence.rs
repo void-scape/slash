@@ -94,6 +94,7 @@ impl BitMass {
 #[derive(Component, Default)]
 struct TempMass(f32);
 
+#[allow(unused)]
 fn coalesce(
     bits: Query<(Entity, &BitMass)>,
     collisions: Collisions,
@@ -154,6 +155,7 @@ fn apply_mass(bits: Query<(Entity, &TempMass, &BitMass)>, mut commands: Commands
     }
 }
 
+#[allow(unused)]
 fn attraction(
     mut bits: Query<(Entity, &Position, Forces, &BitMass), Without<CoalesceTimer>>,
     other: Query<(Entity, &Position, &BitMass)>,
