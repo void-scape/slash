@@ -1,9 +1,4 @@
-use crate::{
-    enemy::{Enemy, steering::SteeringTarget},
-    health::{EnemyHurtbox, Health},
-    player::Player,
-    weapon::{Dagger, HitEvent},
-};
+use crate::weapon::HitEvent;
 use avian2d::prelude::*;
 use bevy::{color::palettes::css::GREEN, prelude::*};
 use rand::Rng;
@@ -16,40 +11,12 @@ pub struct BitsPlugin;
 impl Plugin for BitsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(coalescence::CoalescencePlugin)
-            .add_observer(observe_hit)
-            .add_observer(spawn_enemy);
+            .add_observer(observe_hit);
     }
 }
 
 const BITS_SPEED: f32 = 500f32;
 const INITIAL_SIZE: f32 = 8f32;
-
-fn spawn_enemy(
-    gibblet: On<coalescence::CoalesceEvent>,
-    mut commands: Commands,
-    transforms: Query<&GlobalTransform>,
-    player: Query<Entity, With<Player>>,
-) -> Result {
-    commands.entity(gibblet.entity).despawn();
-    let transform = transforms.get(gibblet.entity)?;
-    let mut entity = commands.spawn((
-        Enemy,
-        Transform::from_translation(transform.translation()),
-        Health::new(4.0),
-        children![
-            (
-                EnemyHurtbox,
-                avian2d::prelude::Collider::rectangle(25.0, 25.0),
-                Transform::default(),
-            ),
-            (Dagger, Transform::from_xyz(0.0, 15.0, 0.0))
-        ],
-    ));
-    if let Ok(player) = player.single() {
-        entity.insert(SteeringTarget(player));
-    }
-    Ok(())
-}
 
 #[derive(Component)]
 #[require(

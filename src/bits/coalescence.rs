@@ -1,4 +1,3 @@
-use crate::Avian;
 use avian2d::prelude::*;
 use bevy::{ecs::entity::EntityHashSet, prelude::*};
 use std::time::Duration;
@@ -8,7 +7,7 @@ pub struct CoalescencePlugin;
 impl Plugin for CoalescencePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            Avian,
+            FixedPostUpdate,
             (
                 CoalesceTimer::manage_timers,
                 coalesce,
@@ -26,9 +25,7 @@ const MASS_THRESOLD: f32 = 30.0;
 
 /// Fired when a bit exceeds the mass threshold.
 #[derive(EntityEvent)]
-pub struct CoalesceEvent {
-    pub entity: Entity,
-}
+pub struct CoalesceEvent(pub Entity);
 
 /// We'll wait a moment to start checking for coalescence.
 #[derive(Component)]
@@ -81,9 +78,7 @@ impl BitMass {
         transform.scale = Vec3::splat(1.0 + (1.0 + mass.0).log10());
 
         if mass.0 >= MASS_THRESOLD {
-            commands.trigger(CoalesceEvent {
-                entity: trigger.entity,
-            });
+            commands.entity(trigger.entity).trigger(CoalesceEvent);
         }
 
         Ok(())

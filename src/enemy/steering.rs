@@ -1,107 +1,95 @@
-use crate::Avian;
-use avian2d::prelude::{LinearVelocity, Physics, PhysicsSystems};
+use avian2d::prelude::{LinearVelocity, PhysicsSystems};
 use bevy::prelude::*;
-use std::f32::consts::{PI, TAU};
 
 pub struct SteeringPlugin;
 
 impl Plugin for SteeringPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            Avian,
-            (steer_homing, apply_heading_velocity)
+            FixedPostUpdate,
+            (
+                (target_vector, seperation_vector),
+                apply_force_vectors,
+                orient_with_velocity,
+            )
                 .chain()
-                .before(PhysicsSystems::StepSimulation),
+                .after(PhysicsSystems::StepSimulation),
         );
-    }
-}
-
-/// Facilitates "steering" behavior, giving enemies a feeling of momentum.
-#[derive(Debug, PartialEq, Clone, Copy, Component)]
-#[require(TurnSpeed)]
-pub struct Heading {
-    pub direction: f32,
-    pub speed: f32,
-}
-
-impl Default for Heading {
-    fn default() -> Self {
-        Self {
-            direction: 0.0,
-            speed: 50.0,
-        }
     }
 }
 
 #[derive(Component)]
-#[require(Heading)]
-pub struct SteeringTarget(pub Entity);
+#[require(TargetVector, SeperationVector)]
+pub struct SteerTarget(pub Entity);
 
-/// The turning speed for headings.
-#[derive(Clone, Copy, PartialEq, Component)]
-pub struct TurnSpeed(pub f32);
+#[derive(Debug, Default, PartialEq, Clone, Copy, Component)]
+pub struct TargetVector(pub Vec2);
 
-impl Default for TurnSpeed {
-    fn default() -> Self {
-        Self(300.0)
-    }
-}
+#[derive(Default, Component)]
+pub struct SeperationVector(pub Vec2);
 
-impl Heading {
-    pub fn steer_towards(&mut self, time: &Time<Physics>, turn_speed: f32, from: Vec2, to: Vec2) {
-        let desired_direction = (to - from).normalize();
-        let desired_angle = desired_direction.y.atan2(desired_direction.x);
-
-        let mut angle_diff = (desired_angle - self.direction) % TAU;
-        if angle_diff > PI {
-            angle_diff = PI - angle_diff;
-        } else if angle_diff < -PI {
-            angle_diff = -PI - angle_diff;
-        };
-
-        self.direction += angle_diff * turn_speed * time.delta_secs();
-        self.direction %= TAU;
-    }
-}
-
-fn steer_homing(
-    mut homing: Query<(
-        Entity,
-        &GlobalTransform,
-        &SteeringTarget,
-        &mut Heading,
-        &TurnSpeed,
-    )>,
+fn target_vector(
+    mut steering: Query<(&mut TargetVector, &GlobalTransform, &SteerTarget)>,
     targets: Query<&GlobalTransform>,
-    time: Res<Time<Physics>>,
-    mut commands: Commands,
+) -> Result {
+    for (mut target_vector, gt, steer_target) in steering.iter_mut() {
+        if let Ok(target) = targets.get(steer_target.0) {
+            let diff = target.translation().xy() - gt.translation().xy();
+            let new_vector = diff.normalize_or_zero();
+            if new_vector != Vec2::ZERO {
+                target_vector.0 = new_vector;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn seperation_vector(
+    steering: Query<(Entity, &GlobalTransform), With<SeperationVector>>,
+    mut seperation_vectors: Query<&mut SeperationVector>,
+) -> Result {
+    let radius = 100.0;
+    let radius_squared = radius * radius;
+    for (target_entity, gt) in steering.iter() {
+        let target_translation = gt.translation().xy();
+        let mut seperation_force = Vec2::ZERO;
+        for (neighbor, neighbor_gt) in steering.iter() {
+            if neighbor == target_entity {
+                continue;
+            }
+            let neighbor_translation = neighbor_gt.translation().xy();
+            if target_translation.distance_squared(neighbor_translation) <= radius_squared {
+                let s = (target_translation - neighbor_translation).normalize_or_zero();
+                seperation_force += s;
+            }
+        }
+        let mut seperation_vector = seperation_vectors.get_mut(target_entity)?;
+        seperation_vector.0 = seperation_force.normalize_or_zero();
+    }
+    Ok(())
+}
+
+fn apply_force_vectors(
+    time: Res<Time>,
+    mut steering: Query<(&mut LinearVelocity, &TargetVector, &SeperationVector)>,
 ) {
+    let impulse = 20.0;
     let delta = time.delta_secs();
+    for (mut velocity, target, seperation) in steering.iter_mut() {
+        let force = target.0 * 2.0 + seperation.0 * 1.2;
+        let acceleration = force * impulse;
 
-    for (entity, transform, target, mut heading, turn_speed) in homing.iter_mut() {
-        let Ok(target) = targets.get(target.0) else {
-            commands.entity(entity).remove::<SteeringTarget>();
-            continue;
-        };
-
-        let transform = transform.compute_transform();
-        let target = target.compute_transform();
-
-        heading.steer_towards(
-            &time,
-            turn_speed.0 * delta,
-            transform.translation.xy(),
-            target.translation.xy(),
-        );
+        velocity.0 += acceleration * delta;
+        velocity.0 = velocity.0.clamp_length_max(50.0);
     }
 }
 
-fn apply_heading_velocity(mut homing: Query<(&mut Transform, &Heading, &mut LinearVelocity)>) {
-    for (mut transform, heading, mut velocity) in homing.iter_mut() {
-        velocity.0.x = heading.speed * heading.direction.cos();
-        velocity.0.y = heading.speed * heading.direction.sin();
-
-        let new_rotation = Quat::from_rotation_z(heading.direction - PI / 2.0);
-        transform.rotation = new_rotation;
+fn orient_with_velocity(mut steering: Query<(&mut Transform, &LinearVelocity), With<SteerTarget>>) {
+    for (mut transform, velocity) in steering.iter_mut() {
+        let vel = velocity.0.normalize_or_zero();
+        if vel != Vec2::ZERO {
+            let angle = Vec2::Y.angle_to(velocity.0.normalize());
+            transform.rotation = Quat::from_rotation_z(angle);
+        }
     }
 }

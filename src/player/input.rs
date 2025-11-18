@@ -1,5 +1,6 @@
 use super::Player;
 use crate::{
+    Layer,
     bits::BitProducer,
     health::FriendlyHitbox,
     weapon::{TriggerWeapon, Weapon, WeaponPickup},
@@ -15,6 +16,7 @@ impl Plugin for InputPlugin {
         app.add_input_context::<Player>()
             .add_observer(inject_bindings)
             .add_observer(apply_movement)
+            .add_observer(stop_movement)
             .add_observer(handle_attack)
             .add_observer(handle_pick_up)
             .add_observer(handle_throw);
@@ -53,8 +55,15 @@ fn inject_bindings(trigger: On<Insert, Player>, mut commands: Commands) {
 #[action_output(Vec2)]
 struct Move;
 
-fn apply_movement(movement: On<Fire<Move>>, mut player: Single<&mut Transform, With<Player>>) {
-    player.translation += movement.value.extend(0.0) * 2.5;
+fn apply_movement(movement: On<Fire<Move>>, mut player: Single<&mut LinearVelocity, With<Player>>) {
+    player.0 = movement.value * 200.0;
+}
+
+fn stop_movement(
+    _movement: On<Complete<Move>>,
+    mut player: Single<&mut LinearVelocity, With<Player>>,
+) {
+    player.0 = Vec2::ZERO;
 }
 
 #[derive(InputAction)]
@@ -112,6 +121,8 @@ fn handle_throw(
 ) {
     let (player_transform, children) = player.into_inner();
     let rotation = player_transform.rotation().to_euler(EulerRot::ZYX).0;
+    let mut layers = FriendlyHitbox::collision_layers();
+    layers.filters |= Layer::Wall.to_bits();
     for entity in weapons.iter_many(children) {
         commands
             .entity(entity)
@@ -121,8 +132,9 @@ fn handle_throw(
                 LinearVelocity(Vec2::Y.rotate(Vec2::from_angle(rotation)) * 1000.0),
                 RigidBody::Dynamic,
                 FriendlyHitbox,
-                FriendlyHitbox::collision_layers(),
+                layers,
                 LinearDamping(3.5),
-            ));
+            ))
+            .remove::<Sensor>();
     }
 }

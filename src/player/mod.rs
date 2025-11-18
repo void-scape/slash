@@ -1,3 +1,5 @@
+use crate::Layer;
+use avian2d::prelude::{Collider, CollisionLayers, LockedAxes, RigidBody};
 use bevy::{color::palettes::css::BLUE, prelude::*, window::PrimaryWindow};
 
 pub mod input;
@@ -15,10 +17,20 @@ impl Plugin for PlayerPlugin {
 #[derive(Component)]
 #[require(
     Transform,
+    RigidBody::Dynamic,
     Sprite::from_color(BLUE, Vec2::new(20.0, 20.0)),
-    Name::new("Player")
+    Name::new("Player"),
+    CollisionLayers = Self::collision_layers(),
+    Collider::circle(7.5),
+    LockedAxes::ROTATION_LOCKED,
 )]
 pub struct Player;
+
+impl Player {
+    fn collision_layers() -> CollisionLayers {
+        CollisionLayers::new(Layer::Empty, Layer::Wall)
+    }
+}
 
 fn orient_player_with_mouse_input(
     window: Single<&Window, With<PrimaryWindow>>,

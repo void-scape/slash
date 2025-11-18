@@ -1,66 +1,139 @@
 use avian2d::prelude::*;
-use bevy::prelude::*;
+use bevy::{
+    ecs::{lifecycle::HookContext, world::DeferredWorld},
+    prelude::*,
+};
 
 use crate::{
+    HEIGHT, WIDTH,
     health::{Damage, EnemyHitbox, FriendlyHitbox, Hitbox, Hurtbox},
-    query::AncestorQuery,
 };
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(
-        Update,
-        (
-            weapon_sprite,
-            weapon_orientation,
-            attack_duration,
-            attack_cooldown,
-            (finish_throw, remove_weapon_rigidbody).chain(),
-        ),
-    )
-    .add_observer(propogate_trigger_weapon)
-    .add_observer(trigger_weapon)
-    .add_observer(hit_event);
+    app.add_message::<HitEvent>()
+        .add_systems(
+            Update,
+            (
+                weapon_sprite,
+                weapon_orientation,
+                attack_duration,
+                attack_cooldown,
+                despawn_bullets,
+                (finish_throw, remove_weapon_rigidbody).chain(),
+            ),
+        )
+        .add_systems(PostUpdate, destroy_on_impact)
+        .add_observer(propogate_trigger_weapon)
+        .add_observer(trigger_weapon)
+        .add_observer(hit_event);
 }
 
 // WEAPONS
+
+// GUNS
 
 #[derive(Component)]
 #[require(
     Weapon,
     Damage(1.0),
+    BulletGenerator::basic(),
+    WeaponReach(15.0),
+    AttackCooldown::from_seconds(0.2),
+    Collider::rectangle(20.0, 20.0),
+    Sprite::from_color(Color::WHITE, Vec2::splat(20.0)),
+    Name::new("Pistol")
+)]
+pub struct Pistol;
+
+// MELEE
+
+#[derive(Component)]
+#[require(
+    Weapon,
+    Melee,
+    Damage(1.0),
     WeaponReach(15.0),
     AttackDuration::from_seconds(0.1),
     AttackCooldown::from_seconds(0.2),
     Collider::rectangle(50.0, 20.0),
-    WeaponSprite("weapons/1.png")
+    WeaponSprite("weapons/1.png"),
+    Name::new("Dagger")
 )]
 pub struct Dagger;
 
 #[derive(Component)]
 #[require(
     Weapon,
+    Melee,
     Damage(1.5),
     WeaponReach(25.0),
     AttackDuration::from_seconds(0.2),
     AttackCooldown::from_seconds(0.4),
     Collider::rectangle(35.0, 55.0),
-    WeaponSprite("weapons/4.png")
+    WeaponSprite("weapons/4.png"),
+    Name::new("Broadsword")
 )]
 pub struct Broadsword;
 
 #[derive(Component)]
 #[require(
     Weapon,
+    Melee,
     Damage(2.5),
     WeaponReach(30.0),
     AttackDuration::from_seconds(0.3),
     AttackCooldown::from_seconds(1.0),
     Collider::rectangle(60.0, 60.0),
-    WeaponSprite("weapons/7.png")
+    WeaponSprite("weapons/7.png"),
+    Name::new("Axe")
 )]
 pub struct Axe;
 
 // COMPONENTS AND SYSTEMS
+
+#[derive(Default, Component)]
+pub struct Melee;
+
+#[derive(Component)]
+pub struct Bullet;
+
+#[derive(Component)]
+pub struct BulletGenerator(Box<dyn FnMut(EntityCommands, LinearVelocity) + Send + Sync>);
+
+impl BulletGenerator {
+    pub fn basic() -> Self {
+        Self(Box::new(|mut entity, mut normalized_velocity| {
+            normalized_velocity.0 *= 400.0;
+            entity
+                .insert((
+                    Sprite::from_color(Color::WHITE, Vec2::splat(20.0)),
+                    normalized_velocity,
+                    DestroyOnImpact,
+                    Collider::circle(10.0),
+                    LockedAxes::ROTATION_LOCKED,
+                ))
+                // `Sensor` causing warnings for some reason. We don't need it
+                // since the collision layers exlude the collisions with the
+                // player and enemies.
+                .remove::<Sensor>();
+        }))
+    }
+}
+
+#[derive(Component)]
+pub struct DestroyOnImpact;
+
+fn destroy_on_impact(
+    mut commands: Commands,
+    mut reader: MessageReader<HitEvent>,
+    destroy: Query<&DestroyOnImpact>,
+) {
+    for event in reader.read() {
+        if destroy.get(event.attacker).is_ok() {
+            commands.entity(event.attacker).despawn();
+        }
+    }
+}
 
 /// Weapon pickup radius.
 #[derive(Component)]
@@ -105,7 +178,7 @@ fn weapon_sprite(
     }
 }
 
-#[derive(EntityEvent)]
+#[derive(EntityEvent, Message)]
 pub struct HitEvent {
     /// The hurtbox this event hits.
     #[event_target]
@@ -120,13 +193,20 @@ fn hit_event(
     start: On<CollisionStart>,
     mut commands: Commands,
     target: Query<&Hurtbox>,
-    attacker: Query<&Hitbox>,
-    weapons: AncestorQuery<Entity, With<Weapon>>,
+    attacker: Query<&AttackSource, With<Hitbox>>,
+    mut writer: MessageWriter<HitEvent>,
 ) -> Result {
-    if target.get(start.collider1).is_ok() && attacker.get(start.collider2).is_ok() {
-        let weapon = weapons.get_inclusive(start.collider2)?;
+    if target.get(start.collider1).is_ok()
+        && let Ok(source) = attacker.get(start.collider2)
+    {
+        let weapon = source.0;
         commands.entity(start.collider1).trigger(|target| HitEvent {
             target,
+            attacker: start.collider2,
+            weapon,
+        });
+        writer.write(HitEvent {
+            target: start.collider1,
             attacker: start.collider2,
             weapon,
         });
@@ -137,9 +217,26 @@ fn hit_event(
 #[derive(Default, Component)]
 // Disable the collider _ON_ the weapon. `TriggerWeapon` will spawn a hitbox
 // and clone this collider.
-#[require(Transform, ColliderDisabled)]
+#[require(Transform, Sensor, ColliderDisabled, LockedAxes::ROTATION_LOCKED)]
 #[cfg_attr(feature = "debug", require(DebugRender::none()))]
+#[component(on_insert = Self::insert)]
 pub struct Weapon;
+
+impl Weapon {
+    fn insert(mut world: DeferredWorld, ctx: HookContext) {
+        // Insert `AttackSource` into the weapon so that `hit_event` can find
+        // the weapon source when it collides with hurtboxes.
+        world
+            .commands()
+            .entity(ctx.entity)
+            .insert(AttackSource(ctx.entity));
+    }
+}
+
+/// Points to the weapon that triggered this attack.
+#[derive(Component)]
+#[require(Sensor)]
+pub struct AttackSource(pub Entity);
 
 #[derive(Clone, Component)]
 pub struct AttackDuration(Timer);
@@ -229,17 +326,26 @@ fn propogate_trigger_weapon(
 fn trigger_weapon(
     trigger: On<TriggerWeapon>,
     mut commands: Commands,
-    mut weapons: Query<(&AttackDuration, &mut AttackCooldown, &Collider), With<Weapon>>,
-) {
-    if let Ok((duration, mut cooldown, collider)) = weapons.get_mut(trigger.entity) {
+    mut melee_weapons: Query<
+        (&AttackDuration, &mut AttackCooldown, &Collider),
+        (With<Weapon>, With<Melee>),
+    >,
+    mut bullet_generators: Query<
+        (&mut AttackCooldown, &mut BulletGenerator),
+        (With<Weapon>, Without<Melee>),
+    >,
+    transforms: Query<&GlobalTransform>,
+) -> Result {
+    if let Ok((duration, mut cooldown, collider)) = melee_weapons.get_mut(trigger.entity) {
         if !cooldown.0.is_finished() {
-            return;
+            return Ok(());
         }
         cooldown.0.reset();
 
         if trigger.friendly {
             commands.spawn((
                 ChildOf(trigger.entity),
+                AttackSource(trigger.entity),
                 FriendlyHitbox,
                 duration.clone(),
                 collider.clone(),
@@ -248,11 +354,55 @@ fn trigger_weapon(
         } else {
             commands.spawn((
                 ChildOf(trigger.entity),
+                AttackSource(trigger.entity),
                 EnemyHitbox,
                 duration.clone(),
                 collider.clone(),
                 Transform::default(),
             ));
+        }
+    } else if let Ok((mut cooldown, mut generator)) = bullet_generators.get_mut(trigger.entity) {
+        if !cooldown.0.is_finished() {
+            return Ok(());
+        }
+        cooldown.0.reset();
+
+        let gt = transforms.get(trigger.entity)?;
+        let translation = gt.translation().xy();
+        let entity = if trigger.friendly {
+            commands.spawn((
+                Bullet,
+                AttackSource(trigger.entity),
+                FriendlyHitbox,
+                RigidBody::Dynamic,
+                Transform::from_translation(translation.extend(0.0)),
+            ))
+        } else {
+            commands.spawn((
+                Bullet,
+                AttackSource(trigger.entity),
+                EnemyHitbox,
+                RigidBody::Dynamic,
+                Transform::from_translation(translation.extend(0.0)),
+            ))
+        };
+        let rotation = gt.rotation().to_euler(EulerRot::ZYX).0;
+        let normalized_velocity = LinearVelocity(Vec2::Y.rotate(Vec2::from_angle(rotation)));
+        (generator.0)(entity, normalized_velocity);
+    }
+    Ok(())
+}
+
+fn despawn_bullets(
+    mut commands: Commands,
+    bullets: Query<(Entity, &GlobalTransform), With<Bullet>>,
+) {
+    let w = WIDTH / 2.0;
+    let h = HEIGHT / 2.0;
+    for (entity, gt) in bullets.iter() {
+        let translation = gt.translation();
+        if translation.x > w || translation.x < -w || translation.y > h || translation.y < -h {
+            commands.entity(entity).despawn();
         }
     }
 }

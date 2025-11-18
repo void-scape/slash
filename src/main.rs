@@ -1,11 +1,11 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
-use avian2d::prelude::Gravity;
-use bevy::{app::FixedMainScheduleOrder, ecs::schedule::ScheduleLabel, prelude::*};
+use avian2d::prelude::{Gravity, PhysicsLayer};
+use bevy::prelude::*;
 use player::Player;
 
-use crate::{enemy::steering::SteeringTarget, weapon::WeaponPickup};
+use crate::bits::coalescence::CoalesceEvent;
 #[cfg(feature = "debug")]
 use bevy::input::common_conditions::input_toggle_active;
 
@@ -58,20 +58,20 @@ fn main() {
     // #[cfg(not(feature = "debug"))]
     app.set_error_handler(bevy::ecs::error::warn);
 
-    // the defalt schedule for Avian is `FixedPostUpdate`, but I wanted something easier to type,
-    // so it is set to `Avian`
-    app.world_mut()
-        .resource_mut::<FixedMainScheduleOrder>()
-        .insert_after(FixedPostUpdate, Avian);
-
     #[cfg(debug_assertions)]
     app.add_systems(Update, close_on_escape);
 
     app.add_systems(Startup, (camera, spawn_scene)).run();
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
-pub struct Avian;
+#[derive(Default, PhysicsLayer)]
+pub enum Layer {
+    #[default]
+    Empty,
+    Wall,
+    FriendlyHurtboxEnemyHitbox,
+    FriendlyHitboxEnemyHurtbox,
+}
 
 #[cfg(debug_assertions)]
 fn close_on_escape(input: Res<ButtonInput<KeyCode>>, mut writer: MessageWriter<AppExit>) {
@@ -92,50 +92,67 @@ fn camera(mut commands: Commands) {
 }
 
 fn spawn_scene(mut commands: Commands) {
-    commands.spawn((WeaponPickup::default(), weapon::Broadsword));
-
-    let player = commands
-        .spawn((
-            Player,
-            health::Health::new(10.0),
-            children![
-                (weapon::Dagger, bits::BitProducer(35)),
-                (
-                    health::FriendlyHurtbox,
-                    avian2d::prelude::Collider::rectangle(15.0, 15.0),
-                    Transform::default(),
-                )
-            ],
-        ))
-        .id();
-
     commands.spawn((
-        enemy::Enemy,
-        SteeringTarget(player),
-        Transform::from_translation(Vec3::new(300.0, 300.0, 0.0)),
-        health::Health::new(4.0),
+        Player,
+        health::Health::new(10.0),
         children![
+            (weapon::Pistol, bits::BitProducer(35)),
             (
-                health::EnemyHurtbox,
-                avian2d::prelude::Collider::rectangle(25.0, 25.0),
+                health::FriendlyHurtbox,
+                avian2d::prelude::Collider::rectangle(15.0, 15.0),
                 Transform::default(),
-            ),
-            (weapon::Broadsword, Transform::from_xyz(0.0, 15.0, 0.0))
+            )
         ],
     ));
 
+    commands
+        .spawn(GlobalTransform::from(Transform::from_translation(
+            Vec3::new(50.0, 50.0, 0.0),
+        )))
+        .trigger(CoalesceEvent);
+    commands
+        .spawn(GlobalTransform::from(Transform::from_translation(
+            Vec3::new(-50.0, 50.0, 0.0),
+        )))
+        .trigger(CoalesceEvent);
+
+    // LEVEL WALLS
+
+    // Bottom
+    use avian2d::prelude::*;
     commands.spawn((
-        enemy::Enemy,
-        SteeringTarget(player),
-        Transform::from_translation(Vec3::new(100.0, 100.0, 0.0)),
-        health::Health::new(4.0),
-        children![
-            (
-                health::EnemyHurtbox,
-                avian2d::prelude::Collider::rectangle(25.0, 25.0),
-                Transform::default(),
-            ),
-            (weapon::Dagger, Transform::from_xyz(0.0, 15.0, 0.0))
-        ],
+        RigidBody::Static,
+        Transform::from_xyz(0.0, -HEIGHT / 2.0, 0.0),
+        Collider::rectangle(WIDTH, 25.0),
+        CollisionLayers::new(Layer::Wall, LayerMask::ALL),
+        CollisionEventsEnabled,
+        Name::new("Wall"),
+    ));
+    // Left wall
+    commands.spawn((
+        RigidBody::Static,
+        Transform::from_xyz(-WIDTH / 2.0, 0.0, 0.0),
+        Collider::rectangle(25.0, HEIGHT),
+        CollisionLayers::new(Layer::Wall, LayerMask::ALL),
+        CollisionEventsEnabled,
+        Name::new("Wall"),
+    ));
+    // Right wall
+    commands.spawn((
+        RigidBody::Static,
+        Transform::from_xyz(WIDTH / 2.0, 0.0, 0.0),
+        Collider::rectangle(25.0, HEIGHT),
+        CollisionLayers::new(Layer::Wall, LayerMask::ALL),
+        CollisionEventsEnabled,
+        Name::new("Wall"),
+    ));
+    // Top
+    commands.spawn((
+        RigidBody::Static,
+        Transform::from_xyz(0.0, HEIGHT / 2.0, 0.0),
+        Collider::rectangle(WIDTH, 25.0),
+        CollisionLayers::new(Layer::Wall, LayerMask::ALL),
+        CollisionEventsEnabled,
+        Name::new("Wall"),
     ));
 }
