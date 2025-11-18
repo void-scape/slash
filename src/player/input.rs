@@ -3,6 +3,7 @@ use crate::{
     Layer,
     bits::BitProducer,
     health::FriendlyHitbox,
+    player::OrientationMethod,
     weapon::{TriggerWeapon, Weapon, WeaponPickup},
 };
 use avian2d::prelude::*;
@@ -19,7 +20,8 @@ impl Plugin for InputPlugin {
             .add_observer(stop_movement)
             .add_observer(handle_attack)
             .add_observer(handle_pick_up)
-            .add_observer(handle_throw);
+            .add_observer(handle_throw)
+            .add_observer(handle_aim);
     }
 }
 
@@ -34,9 +36,21 @@ fn inject_bindings(trigger: On<Insert, Player>, mut commands: Commands) {
             )),
         ),
         (
+            Action::<Aim>::new(),
+            DeadZone {
+                lower_threshold: 0.5,
+                ..Default::default()
+            },
+            SmoothNudge::new(16.0),
+            Bindings::spawn((
+                Cardinal::arrows(),
+                Axial::right_stick(),
+            )),
+        ),
+        (
             Action::<Attack>::new(),
             Press::default(),
-            bindings![KeyCode::Space, GamepadButton::West, MouseButton::Left],
+            bindings![KeyCode::Space, GamepadButton::West, GamepadButton::RightTrigger2, MouseButton::Left],
         ),
         (
             Action::<PickUp>::new(),
@@ -46,7 +60,7 @@ fn inject_bindings(trigger: On<Insert, Player>, mut commands: Commands) {
         (
             Action::<Throw>::new(),
             Press::default(),
-            bindings![KeyCode::KeyC, GamepadButton::North],
+            bindings![KeyCode::KeyC, GamepadButton::RightTrigger2, GamepadButton::North],
         ),
     ]));
 }
@@ -136,5 +150,23 @@ fn handle_throw(
                 LinearDamping(3.5),
             ))
             .remove::<Sensor>();
+    }
+}
+
+#[derive(InputAction)]
+#[action_output(Vec2)]
+struct Aim;
+
+fn handle_aim(
+    aim: On<Fire<Aim>>,
+    player: Single<(&mut Transform, &mut OrientationMethod), With<Player>>,
+) {
+    let (mut transform, mut method) = player.into_inner();
+    *method = OrientationMethod::Stick;
+
+    let angle = aim.value.normalize_or_zero();
+    if angle.length_squared() != 0.0 {
+        let angle = Vec2::Y.angle_to(angle);
+        transform.rotation = Quat::from_rotation_z(angle);
     }
 }
