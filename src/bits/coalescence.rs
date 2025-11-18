@@ -1,6 +1,9 @@
 use avian2d::prelude::*;
-use bevy::{ecs::entity::EntityHashSet, prelude::*};
+use bevy::{color::palettes::css::YELLOW, ecs::entity::EntityHashSet, prelude::*};
+use rand::Rng;
 use std::time::Duration;
+
+use crate::bits::Bit;
 
 pub struct CoalescencePlugin;
 
@@ -10,14 +13,17 @@ impl Plugin for CoalescencePlugin {
             FixedPostUpdate,
             (
                 CoalesceTimer::manage_timers,
-                coalesce,
+                // coalesce,
+                absorb,
                 apply_mass,
-                attraction,
+                apply_absorption_forces,
+                // attraction,
             )
                 .chain()
                 .in_set(PhysicsSystems::Last),
         )
-        .add_observer(BitMass::insert);
+        .add_observer(BitMass::insert)
+        .add_observer(assign_absorber);
     }
 }
 
@@ -170,5 +176,118 @@ fn attraction(
         }
 
         forces.apply_force(impulse * 300.0);
+    }
+}
+
+#[derive(Component)]
+#[relationship(relationship_target = Absorbees)]
+pub struct AbsorbeeOf(pub Entity);
+
+#[derive(Component)]
+#[relationship_target(relationship = AbsorbeeOf)]
+pub struct Absorbees(Vec<Entity>);
+
+/// This ensures each absorber receives (on average) an exact share of the total bits.
+fn assign_absorber(
+    trigger: On<Insert, Bit>,
+    absorbers: Query<Entity, With<Absorber>>,
+    mut commands: Commands,
+) -> Result {
+    let total = absorbers.iter().len();
+    let selection: usize = rand::rng().random_range(0..total);
+
+    let selection = absorbers
+        .iter()
+        .nth(selection)
+        .ok_or("Expected at least `nth` absorbers")?;
+
+    commands
+        .entity(trigger.entity)
+        .insert(AbsorbeeOf(selection));
+
+    Ok(())
+}
+
+#[derive(Component)]
+#[require(
+    Transform,
+    Collider = Collider::rectangle(40.0, 40.0),
+    Sprite::from_color(YELLOW, Vec2::splat(40.0)),
+)]
+pub struct Absorber {
+    pub mass: f32,
+    pub bits_absorbed: f32,
+}
+
+impl Absorber {
+    pub fn new(mass: f32) -> Self {
+        Self {
+            mass,
+            bits_absorbed: 0.0,
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct EnemyAbsorber;
+
+fn apply_absorption_forces(
+    mut bits: Query<(&Position, Forces, &BitMass, &AbsorbeeOf), Without<CoalesceTimer>>,
+    absorbers: Query<(&Absorber, &Position)>,
+) -> Result {
+    for (position, mut forces, mass, absorber) in &mut bits {
+        let mut impulse = Vec2::ZERO;
+
+        let (other_mass, other_pos) = absorbers.get(absorber.0)?;
+
+        // gmm/r^2
+        let mass = mass.0 * other_mass.mass;
+        let direction = (other_pos.0 - position.0).normalize_or_zero();
+        let distance = other_pos.distance(position.0);
+        let force = mass / distance.max(0.01);
+
+        impulse += force.min(25.0) * direction;
+
+        forces.apply_force(impulse * 900.0);
+    }
+
+    Ok(())
+}
+
+fn absorb(
+    mut absorbers: Query<(Entity, &mut Absorber, Has<EnemyAbsorber>)>,
+    bits: Query<(Entity, &BitMass)>,
+    collisions: Collisions,
+    mut commands: Commands,
+) {
+    for (absorber_entity, mut absorber, is_enemy_absorber) in &mut absorbers {
+        let bits_absorbed = &mut absorber.bits_absorbed;
+
+        for contact_pair in collisions.collisions_with(absorber_entity) {
+            if !contact_pair.is_touching() {
+                continue;
+            }
+
+            let other = if contact_pair.collider1 == absorber_entity {
+                contact_pair.collider2
+            } else {
+                contact_pair.collider1
+            };
+
+            let Ok((_, &BitMass(other_mass))) = bits.get(other) else {
+                continue;
+            };
+
+            *bits_absorbed += other_mass;
+            commands.entity(other).despawn();
+
+            if *bits_absorbed >= MASS_THRESOLD {
+                *bits_absorbed -= MASS_THRESOLD;
+
+                if is_enemy_absorber {
+                    commands.trigger(CoalesceEvent(absorber_entity));
+                }
+            }
+        }
     }
 }

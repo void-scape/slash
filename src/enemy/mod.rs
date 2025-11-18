@@ -37,7 +37,7 @@ fn spawn_enemy(
     player: Query<Entity, With<Player>>,
     mut rng: Single<&mut WyRand, With<GlobalRng>>,
 ) -> Result {
-    commands.entity(gibblet.0).despawn();
+    // commands.entity(gibblet.0).despawn();
     let transform = transforms.get(gibblet.0)?;
     let mut entity = commands.spawn((
         Enemy,

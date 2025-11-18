@@ -27,6 +27,7 @@ const INITIAL_SIZE: f32 = 8f32;
     CollisionEventsEnabled,
     LinearDamping(4.0),
     ColliderDisabled,
+    Sensor,
     Sprite::from_color(GREEN, Vec2::splat(INITIAL_SIZE))
 )]
 pub struct Bit;

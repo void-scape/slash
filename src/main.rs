@@ -2,10 +2,17 @@
 #![allow(clippy::too_many_arguments)]
 
 use avian2d::prelude::{Gravity, PhysicsLayer};
-use bevy::prelude::*;
+use bevy::{
+    color::palettes::css::GREEN,
+    log::{DEFAULT_FILTER, LogPlugin},
+    prelude::*,
+};
 use player::Player;
 
-use crate::bits::coalescence::CoalesceEvent;
+use crate::{
+    bits::coalescence::{Absorber, CoalesceEvent, EnemyAbsorber},
+    health::Health,
+};
 #[cfg(feature = "debug")]
 use bevy::input::common_conditions::input_toggle_active;
 
@@ -30,6 +37,12 @@ fn main() {
                     resolution: (WIDTH as u32, HEIGHT as u32).into(),
                     ..Default::default()
                 }),
+                ..Default::default()
+            })
+            .set(LogPlugin {
+                filter: format!(
+                    "avian2d::dynamics::rigid_body::mass_properties=off,{DEFAULT_FILTER}"
+                ),
                 ..Default::default()
             }),
         bevy_rand::prelude::EntropyPlugin::<bevy_rand::prelude::WyRand>::with_seed(
@@ -115,6 +128,19 @@ fn spawn_scene(mut commands: Commands) {
             Vec3::new(-50.0, 50.0, 0.0),
         )))
         .trigger(CoalesceEvent);
+
+    commands.spawn((
+        Absorber::new(50.0),
+        Health::new(100.0),
+        EnemyAbsorber,
+        Transform::from_xyz(0.0, 300.0, 0.0),
+    ));
+    commands.spawn((
+        Absorber::new(50.0),
+        Health::new(100.0),
+        Transform::from_xyz(-300.0, 100.0, 0.0),
+        Sprite::from_color(GREEN, Vec2::splat(40.0)),
+    ));
 
     // LEVEL WALLS
 
