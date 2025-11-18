@@ -6,7 +6,7 @@ use crate::{
     player::Player,
     weapon::{Broadsword, Dagger, Pistol, TriggerWeapon, Weapon, WeaponPickup, WeaponReach},
 };
-use avian2d::prelude::{Collider, CollisionLayers, LockedAxes, RigidBody};
+use avian2d::prelude::{Collider, ColliderOf, CollisionLayers, LockedAxes, RigidBody};
 use bevy::{
     color::palettes::css::{BLUE, GREEN, RED},
     prelude::*,
@@ -145,7 +145,7 @@ fn drop_weapon_on_death(
             if let Some(weapon_entity) = iter.fetch_next() {
                 commands
                     .entity(weapon_entity)
-                    .remove::<ChildOf>()
+                    .remove::<(ChildOf, ColliderOf)>()
                     .insert((WeaponPickup::default(), transform.compute_transform()));
             }
         }

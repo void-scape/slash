@@ -134,10 +134,7 @@ fn on_hit(
 
 pub fn despawn_dead(mut commands: Commands, mut reader: MessageReader<DeathEvent>) {
     for event in reader.read() {
-        commands
-            .entity(event.0)
-            .despawn_related::<HealthBars>()
-            .despawn();
+        commands.entity(event.0).despawn();
     }
 }
 
