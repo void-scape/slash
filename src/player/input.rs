@@ -60,7 +60,7 @@ fn inject_bindings(trigger: On<Insert, Player>, mut commands: Commands) {
         (
             Action::<Throw>::new(),
             Press::default(),
-            bindings![KeyCode::KeyC, GamepadButton::RightTrigger2, GamepadButton::North],
+            bindings![KeyCode::KeyC, GamepadButton::LeftTrigger2, GamepadButton::North],
         ),
     ]));
 }
