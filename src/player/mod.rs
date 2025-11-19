@@ -2,6 +2,7 @@ use crate::{
     Layer,
     physics::Acceleration,
     player::input::{Dashing, RetainedMove},
+    weapon::ApplyWeaponDurability,
 };
 use avian2d::prelude::{
     Collider, CollisionLayers, LinearDamping, LockedAxes, MaxLinearSpeed, RigidBody,
@@ -36,6 +37,7 @@ impl Plugin for PlayerPlugin {
     LinearDamping = Self::LINEAR_DAMPING,
     MaxLinearSpeed = Self::MAX_SPEED,
     RetainedMove,
+    ApplyWeaponDurability,
 )]
 pub struct Player;
 

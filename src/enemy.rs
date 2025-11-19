@@ -1,6 +1,6 @@
 use crate::{
     Layer,
-    bits::coalescence::CoalesceEvent,
+    bits::{self, coalescence::CoalesceEvent},
     health::{DeathEvent, DeathSystems, EnemyHurtbox, MaxHealth},
     physics::{Acceleration, CustomPhysicsSystems},
     player::Player,
@@ -67,7 +67,9 @@ fn spawn_enemy(
     if let Ok(player) = player.single() {
         entity.insert(SteerTarget(player));
     }
-    entity.observe(weapon::weapon_knockback);
+    entity
+        .observe(weapon::weapon_knockback)
+        .observe(bits::produce_bits);
     sample_enemy_type(entity, &mut rng);
     Ok(())
 }

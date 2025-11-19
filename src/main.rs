@@ -118,7 +118,7 @@ fn spawn_scene(mut commands: Commands) {
             children![
                 (
                     weapon::Dagger,
-                    WeaponDurability::Hit(100),
+                    WeaponDurability::Hit(3),
                     bits::BitProducer(35)
                 ),
                 (
@@ -129,7 +129,6 @@ fn spawn_scene(mut commands: Commands) {
                 )
             ],
         ))
-        .observe(bits::produce_bits)
         .observe(weapon::weapon_knockback);
 
     commands

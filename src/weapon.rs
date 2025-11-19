@@ -10,6 +10,7 @@ use crate::{
     bits::BitProducer,
     health::{EnemyHitbox, FriendlyHitbox, Hitbox, Hurtbox},
     physics::acceleration,
+    query::AncestorQuery,
 };
 use bevy_tween::{
     combinator::tween,
@@ -124,6 +125,12 @@ pub struct Weapon;
 
 #[derive(Clone, Copy, Component)]
 pub struct Damage(pub f32);
+
+/// Determines if [`WeaponDurability`] should be decremented.
+///
+/// This marker can live anywhere above the weapon.
+#[derive(Default, Component)]
+pub struct ApplyWeaponDurability;
 
 /// Number of hits that a weapon can susatin before shattering.
 #[derive(Component)]
@@ -356,6 +363,7 @@ fn trigger_weapon(
         With<Weapon>,
     >,
     transforms: Query<&GlobalTransform>,
+    apply_durability: AncestorQuery<&ApplyWeaponDurability>,
 ) -> Result {
     if let Ok((mut cooldown, durability, knockback, bit_producer, handler)) =
         weapons.get_mut(trigger.entity)
@@ -387,7 +395,9 @@ fn trigger_weapon(
             bevy::ecs::error::warn,
         );
 
-        if let Some(durability) = durability {
+        if apply_durability.get(trigger.entity).is_ok()
+            && let Some(durability) = durability
+        {
             match durability.into_inner() {
                 WeaponDurability::Fire(durability) => {
                     *durability = durability.saturating_sub(1);
