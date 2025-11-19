@@ -1,8 +1,6 @@
 use crate::{
     Layer,
-    physics::Acceleration,
-    player::input::{Dashing, RetainedMove},
-    weapon::ApplyWeaponDurability,
+    player::input::{Dashing, Finishing, RetainedMove},
 };
 use avian2d::prelude::{
     Collider, CollisionLayers, LinearDamping, LockedAxes, MaxLinearSpeed, RigidBody,
@@ -33,11 +31,9 @@ impl Plugin for PlayerPlugin {
     Collider::circle(7.5),
     LockedAxes::ROTATION_LOCKED,
     OrientationMethod,
-    Acceleration,
     LinearDamping = Self::LINEAR_DAMPING,
     MaxLinearSpeed = Self::MAX_SPEED,
-    RetainedMove,
-    ApplyWeaponDurability,
+    RetainedMove
 )]
 pub struct Player;
 
@@ -62,14 +58,12 @@ pub enum OrientationMethod {
 fn orient_player_with_mouse_input(
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform)>,
-    player: Single<(&mut Transform, &mut OrientationMethod), With<Player>>,
+    player: Single<
+        (&mut Transform, &mut OrientationMethod),
+        (With<Player>, Without<Dashing>, Without<Finishing>),
+    >,
     mut motion: MessageReader<MouseMotion>,
-    is_dashing: Query<&Dashing>,
 ) {
-    if !is_dashing.is_empty() {
-        return;
-    }
-
     let (mut player_transform, mut orientation) = player.into_inner();
     if let OrientationMethod::Stick = *orientation {
         if motion.read().last().is_none() {

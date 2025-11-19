@@ -11,7 +11,9 @@ pub struct BitsPlugin;
 
 impl Plugin for BitsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(coalescence::CoalescencePlugin);
+        app.add_plugins(coalescence::CoalescencePlugin)
+            .add_message::<BitEvent>()
+            .add_systems(Update, handle_bit_events);
     }
 }
 
@@ -36,21 +38,36 @@ pub struct Bit;
 #[derive(Default, Clone, Copy, Component)]
 pub struct BitProducer(pub usize);
 
-pub fn produce_bits(
-    hit: On<HitEvent>,
+#[derive(Message)]
+pub struct BitEvent {
+    pub direction: Vec2,
+    pub translation: Vec2,
+    pub bits: usize,
+}
+
+fn handle_bit_events(
     mut commands: Commands,
+    mut reader: MessageReader<BitEvent>,
     mut rng: Single<&mut WyRand, With<GlobalRng>>,
-) -> Result {
-    let direction = hit.target_translation - hit.attacker_translation;
-    for _ in 0..hit.bits {
-        let direction = random_direction_in_arc(direction, PI * 0.75, &mut rng);
-        commands.spawn((
-            Bit,
-            Transform::from_translation(hit.target_translation.extend(0.0)),
-            LinearVelocity(direction * BITS_SPEED * rng.random_range(0.8..1.2)),
-        ));
+) {
+    for event in reader.read() {
+        for _ in 0..event.bits {
+            let direction = random_direction_in_arc(event.direction, PI * 0.75, &mut rng);
+            commands.spawn((
+                Bit,
+                Transform::from_translation(event.translation.extend(0.0)),
+                LinearVelocity(direction * BITS_SPEED * rng.random_range(0.8..1.2)),
+            ));
+        }
     }
-    Ok(())
+}
+
+pub fn produce_bits(hit: On<HitEvent>, mut writer: MessageWriter<BitEvent>) {
+    writer.write(BitEvent {
+        direction: hit.target_translation - hit.attacker_translation,
+        translation: hit.target_translation,
+        bits: hit.bits,
+    });
 }
 
 /// Returns a random unit vector whose direction lies within an arc of `arc_radians`

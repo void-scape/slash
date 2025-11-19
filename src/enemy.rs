@@ -1,7 +1,7 @@
 use crate::{
     Layer,
     bits::{self, coalescence::CoalesceEvent},
-    health::{DeathEvent, DeathSystems, EnemyHurtbox, MaxHealth},
+    health::{CurrentHealth, DeathEvent, DeathSystems, EnemyHurtbox, MaxHealth},
     physics::{Acceleration, CustomPhysicsSystems},
     player::Player,
     weapon::{self, Broadsword, Dagger, Pistol, TriggerWeapon, Weapon, WeaponPickup, WeaponReach},
@@ -11,6 +11,7 @@ use avian2d::prelude::{
 };
 use bevy::{
     color::palettes::css::{BLUE, GREEN, RED},
+    ecs::{lifecycle::HookContext, world::DeferredWorld},
     prelude::*,
 };
 use bevy_rand::{global::GlobalRng, prelude::WyRand};
@@ -31,17 +32,62 @@ impl Plugin for EnemyPlugin {
                 ),
             )
             .add_observer(spawn_enemy);
+
+        app.add_systems(Update, (insert_finisher_target, flash_finisher_targets));
     }
 }
 
-#[derive(Component)]
+macro_rules! enemy {
+    {
+        $(#[$attrs:meta])*
+        pub struct $ident:ident;
+        impl $impl:ident {
+            COLOR = $color:expr;
+            VISUAL_RADIUS = $visual:expr;
+            HURTBOX_RADIUS = $hurtbox:expr;
+            COLLISION_RADIUS = $collision:expr;
+            WEAPON = $weapon:ident;
+        }
+    } => {
+        #[allow(unused)]
+        $(#[$attrs])*
+        #[require(
+            Sprite::from_color(Self::color(), Vec2::splat(Self::VISUAL_RADIUS * 2.0)),
+        )]
+        #[component(on_insert = Self::insert)]
+        pub struct $ident;
+        #[allow(unused)]
+        impl $impl {
+            fn color() -> Color {
+                $color
+            }
+            const VISUAL_RADIUS: f32 = $visual;
+            const HURTBOX_RADIUS: f32 = $hurtbox;
+            const COLLISION_RADIUS: f32 = $collision;
+            fn insert(mut world: DeferredWorld, ctx: HookContext) {
+                world.commands().spawn((
+                    ChildOf(ctx.entity),
+                    EnemyHurtbox,
+                    avian2d::prelude::Collider::circle(Self::HURTBOX_RADIUS),
+                    Transform::default(),
+                ));
+                world.commands().spawn((
+                    $weapon,
+                    WeaponReach(Self::VISUAL_RADIUS * 1.2),
+                ));
+            }
+        }
+    };
+}
+
+#[derive(Default, Component)]
 #[require(
     Transform,
     RigidBody::Dynamic,
     Name::new("Enemy"),
     CollisionLayers = Self::collision_layers(),
     LockedAxes::ROTATION_LOCKED,
-    MaxLinearSpeed(40.0)
+    MaxLinearSpeed(40.0),
 )]
 pub struct Enemy;
 
@@ -50,6 +96,22 @@ impl Enemy {
         CollisionLayers::new(Layer::Empty, Layer::Wall)
     }
 }
+
+enemy! {
+    #[derive(Component)]
+    #[require(MaxHealth(f32::MAX))]
+    pub struct Dummy;
+    impl Dummy {
+        COLOR = RED.into();
+        VISUAL_RADIUS = 30.0;
+        HURTBOX_RADIUS = 30.0;
+        COLLISION_RADIUS = 30.0;
+        WEAPON = Dagger;
+    }
+}
+
+#[derive(Default, Component)]
+pub struct EnableAttacks;
 
 fn spawn_enemy(
     gibblet: On<CoalesceEvent>,
@@ -82,6 +144,7 @@ fn sample_enemy_type(mut entity: EntityCommands, rng: &mut impl Rng) {
             entity.insert((
                 Sprite::from_color(RED, Vec2::splat(size)),
                 MaxHealth(3.0),
+                EnableAttacks,
                 children![
                     (
                         EnemyHurtbox,
@@ -97,6 +160,7 @@ fn sample_enemy_type(mut entity: EntityCommands, rng: &mut impl Rng) {
             entity.insert((
                 Sprite::from_color(GREEN, Vec2::splat(size)),
                 MaxHealth(2.0),
+                EnableAttacks,
                 children![
                     (
                         EnemyHurtbox,
@@ -112,6 +176,7 @@ fn sample_enemy_type(mut entity: EntityCommands, rng: &mut impl Rng) {
             entity.insert((
                 Sprite::from_color(BLUE, Vec2::splat(size)),
                 MaxHealth(4.0),
+                EnableAttacks,
                 children![
                     (
                         EnemyHurtbox,
@@ -128,7 +193,7 @@ fn sample_enemy_type(mut entity: EntityCommands, rng: &mut impl Rng) {
 
 fn attack(
     mut commands: Commands,
-    enemies: Query<Entity, With<Enemy>>,
+    enemies: Query<Entity, (With<Enemy>, With<EnableAttacks>)>,
     mut rng: Single<&mut WyRand, With<GlobalRng>>,
 ) {
     for entity in enemies.iter() {
@@ -228,5 +293,41 @@ fn orient_to_player(
         let looking_at = player_translation - transform.translation.xy();
         let angle = Vec2::Y.angle_to(looking_at.normalize_or(Vec2::Y));
         transform.rotation = Quat::from_rotation_z(angle);
+    }
+}
+
+#[derive(Component)]
+pub struct FinisherTarget;
+
+fn insert_finisher_target(
+    mut commands: Commands,
+    enemies: Query<(Entity, &CurrentHealth, &MaxHealth), (Changed<CurrentHealth>, With<Enemy>)>,
+) {
+    for (entity, current, max) in enemies.iter() {
+        if current.0 / max.0 <= 0.25 || (current.0 <= 1.0 && max.0 > 1.0) {
+            commands.entity(entity).insert((
+                FinisherTarget,
+                FlashTimer(Timer::from_seconds(0.25, TimerMode::Repeating)),
+            ));
+        }
+    }
+}
+
+#[derive(Component)]
+struct FlashTimer(Timer);
+
+fn flash_finisher_targets(
+    time: Res<Time>,
+    mut targets: Query<(&mut Sprite, &mut FlashTimer), With<FinisherTarget>>,
+) {
+    for (mut sprite, mut timer) in targets.iter_mut() {
+        timer.0.tick(time.delta());
+        if timer.0.just_finished() {
+            if sprite.color == Color::WHITE {
+                sprite.color = Color::BLACK;
+            } else {
+                sprite.color = Color::WHITE;
+            }
+        }
     }
 }

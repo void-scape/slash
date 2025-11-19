@@ -1,22 +1,21 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
-use avian2d::prelude::{Gravity, PhysicsLayer};
+use crate::{
+    bits::coalescence::CoalesceEvent,
+    enemy::Dummy,
+    health::MaxHealth,
+    player::PlayerHurtbox,
+    weapon::{ApplyWeaponDurability, WeaponDurability},
+};
+use avian2d::prelude::*;
+#[cfg(feature = "debug")]
+use bevy::input::common_conditions::input_toggle_active;
 use bevy::{
-    color::palettes::css::GREEN,
     log::{DEFAULT_FILTER, LogPlugin},
     prelude::*,
 };
 use player::Player;
-
-use crate::{
-    bits::coalescence::{Absorber, CoalesceEvent, EnemyAbsorber},
-    health::MaxHealth,
-    player::PlayerHurtbox,
-    weapon::WeaponDurability,
-};
-#[cfg(feature = "debug")]
-use bevy::input::common_conditions::input_toggle_active;
 
 mod bits;
 mod enemy;
@@ -79,7 +78,8 @@ fn main() {
     #[cfg(debug_assertions)]
     app.add_systems(Update, close_on_escape);
 
-    app.add_systems(Startup, (camera, spawn_scene)).run();
+    app.add_systems(Startup, (camera, spawn_training_scene))
+        .run();
 }
 
 #[derive(Default, PhysicsLayer)]
@@ -109,62 +109,56 @@ fn camera(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
 
+#[allow(unused)]
+fn spawn_training_scene(mut commands: Commands) {
+    let mut root = commands.spawn((Transform::default(), Visibility::default()));
+    root.with_child((Dummy, Transform::default()));
+    root.with_child((
+        Player,
+        Transform::from_xyz(0.0, 80.0, 0.0),
+        children![weapon::Dagger],
+    ));
+    level_walls(root);
+}
+
+#[allow(unused)]
 fn spawn_scene(mut commands: Commands) {
-    commands
-        .spawn((
-            Player,
-            Transform::from_xyz(0.0, -30.0, 0.0),
-            MaxHealth(10.0),
-            children![
-                (
-                    weapon::Dagger,
-                    WeaponDurability::Hit(3),
-                    bits::BitProducer(35)
-                ),
-                (
-                    PlayerHurtbox,
-                    health::FriendlyHurtbox,
-                    avian2d::prelude::Collider::rectangle(15.0, 15.0),
-                    Transform::default(),
-                )
-            ],
-        ))
-        .observe(weapon::weapon_knockback);
-
-    commands
-        .spawn(GlobalTransform::from(Transform::from_translation(
-            Vec3::new(100.0, 100.0, 0.0),
-        )))
-        .trigger(CoalesceEvent);
-    commands
-        .spawn(GlobalTransform::from(Transform::from_translation(
-            Vec3::new(-100.0, 100.0, 0.0),
-        )))
-        .trigger(CoalesceEvent);
-    commands
-        .spawn(GlobalTransform::from(Transform::from_translation(
-            Vec3::new(0.0, 0.0, 0.0),
-        )))
-        .trigger(CoalesceEvent);
-
-    commands.spawn((
-        Absorber::new(50.0),
-        MaxHealth(100.0),
-        EnemyAbsorber,
-        Transform::from_xyz(0.0, 300.0, 0.0),
-    ));
-    commands.spawn((
-        Absorber::new(50.0),
-        MaxHealth(100.0),
-        Transform::from_xyz(-300.0, 100.0, 0.0),
-        Sprite::from_color(GREEN, Vec2::splat(40.0)),
+    let mut root = commands.spawn((Transform::default(), Visibility::default()));
+    root.with_child((
+        Player,
+        ApplyWeaponDurability,
+        Transform::from_xyz(0.0, -30.0, 0.0),
+        MaxHealth(10.0),
+        children![
+            (weapon::Dagger, WeaponDurability::Hit(3)),
+            (
+                PlayerHurtbox,
+                health::FriendlyHurtbox,
+                avian2d::prelude::Collider::rectangle(15.0, 15.0),
+                Transform::default(),
+            )
+        ],
     ));
 
-    // LEVEL WALLS
+    root.with_child(GlobalTransform::from(Transform::from_translation(
+        Vec3::new(100.0, 100.0, 0.0),
+    )))
+    .trigger(CoalesceEvent);
+    root.with_child(GlobalTransform::from(Transform::from_translation(
+        Vec3::new(-100.0, 100.0, 0.0),
+    )))
+    .trigger(CoalesceEvent);
+    root.with_child(GlobalTransform::from(Transform::from_translation(
+        Vec3::new(0.0, 0.0, 0.0),
+    )))
+    .trigger(CoalesceEvent);
 
+    level_walls(root);
+}
+
+fn level_walls(mut commands: EntityCommands) {
     // Bottom
-    use avian2d::prelude::*;
-    commands.spawn((
+    commands.with_child((
         RigidBody::Static,
         Transform::from_xyz(0.0, -HEIGHT / 2.0, 0.0),
         Collider::rectangle(WIDTH, 25.0),
@@ -173,7 +167,7 @@ fn spawn_scene(mut commands: Commands) {
         Name::new("Wall"),
     ));
     // Left wall
-    commands.spawn((
+    commands.with_child((
         RigidBody::Static,
         Transform::from_xyz(-WIDTH / 2.0, 0.0, 0.0),
         Collider::rectangle(25.0, HEIGHT),
@@ -182,7 +176,7 @@ fn spawn_scene(mut commands: Commands) {
         Name::new("Wall"),
     ));
     // Right wall
-    commands.spawn((
+    commands.with_child((
         RigidBody::Static,
         Transform::from_xyz(WIDTH / 2.0, 0.0, 0.0),
         Collider::rectangle(25.0, HEIGHT),
@@ -191,7 +185,7 @@ fn spawn_scene(mut commands: Commands) {
         Name::new("Wall"),
     ));
     // Top
-    commands.spawn((
+    commands.with_child((
         RigidBody::Static,
         Transform::from_xyz(0.0, HEIGHT / 2.0, 0.0),
         Collider::rectangle(WIDTH, 25.0),

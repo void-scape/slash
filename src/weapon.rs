@@ -63,6 +63,7 @@ pub struct Pistol;
 #[require(
     Weapon,
     Damage(1.0),
+    BitProducer(3),
     WeaponReach(15.0),
     WeaponDurability::Hit(3),
     AttackHandler::melee(),
@@ -79,6 +80,7 @@ pub struct Dagger;
 #[require(
     Weapon,
     Damage(1.5),
+    BitProducer(5),
     WeaponReach(25.0),
     WeaponDurability::Hit(3),
     AttackHandler::melee(),
@@ -95,6 +97,7 @@ pub struct Broadsword;
 #[require(
     Weapon,
     Damage(2.5),
+    BitProducer(10),
     WeaponReach(30.0),
     WeaponDurability::Hit(3),
     AttackHandler::melee(),
