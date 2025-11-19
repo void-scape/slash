@@ -11,7 +11,7 @@ use player::Player;
 
 use crate::{
     bits::coalescence::{Absorber, CoalesceEvent, EnemyAbsorber},
-    health::Health,
+    health::MaxHealth,
     player::PlayerHurtbox,
     weapon::WeaponDurability,
 };
@@ -110,24 +110,27 @@ fn camera(mut commands: Commands) {
 }
 
 fn spawn_scene(mut commands: Commands) {
-    commands.spawn((
-        Player,
-        Transform::from_xyz(0.0, -30.0, 0.0),
-        health::Health::new(10.0),
-        children![
-            (
-                weapon::Dagger,
-                WeaponDurability(100),
-                bits::BitProducer(35),
-            ),
-            (
-                PlayerHurtbox,
-                health::FriendlyHurtbox,
-                avian2d::prelude::Collider::rectangle(15.0, 15.0),
-                Transform::default(),
-            )
-        ],
-    ));
+    commands
+        .spawn((
+            Player,
+            Transform::from_xyz(0.0, -30.0, 0.0),
+            MaxHealth(10.0),
+            children![
+                (
+                    weapon::Dagger,
+                    WeaponDurability::Hit(100),
+                    bits::BitProducer(35)
+                ),
+                (
+                    PlayerHurtbox,
+                    health::FriendlyHurtbox,
+                    avian2d::prelude::Collider::rectangle(15.0, 15.0),
+                    Transform::default(),
+                )
+            ],
+        ))
+        .observe(bits::produce_bits)
+        .observe(weapon::weapon_knockback);
 
     commands
         .spawn(GlobalTransform::from(Transform::from_translation(
@@ -147,13 +150,13 @@ fn spawn_scene(mut commands: Commands) {
 
     commands.spawn((
         Absorber::new(50.0),
-        Health::new(100.0),
+        MaxHealth(100.0),
         EnemyAbsorber,
         Transform::from_xyz(0.0, 300.0, 0.0),
     ));
     commands.spawn((
         Absorber::new(50.0),
-        Health::new(100.0),
+        MaxHealth(100.0),
         Transform::from_xyz(-300.0, 100.0, 0.0),
         Sprite::from_color(GREEN, Vec2::splat(40.0)),
     ));

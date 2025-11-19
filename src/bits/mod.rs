@@ -1,6 +1,7 @@
 use crate::weapon::HitEvent;
 use avian2d::prelude::*;
 use bevy::{color::palettes::css::GREEN, prelude::*};
+use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::Rng;
 use std::f32::consts::PI;
 
@@ -10,8 +11,7 @@ pub struct BitsPlugin;
 
 impl Plugin for BitsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(coalescence::CoalescencePlugin)
-            .add_observer(observe_hit);
+        app.add_plugins(coalescence::CoalescencePlugin);
     }
 }
 
@@ -33,34 +33,23 @@ const INITIAL_SIZE: f32 = 8f32;
 pub struct Bit;
 
 /// Describes the number of bits an attack will produce.
-#[derive(Component)]
+#[derive(Default, Clone, Copy, Component)]
 pub struct BitProducer(pub usize);
 
-fn observe_hit(
-    trigger: On<HitEvent>,
-    transforms: Query<&GlobalTransform>,
-    weapon: Query<&BitProducer>,
+pub fn produce_bits(
+    hit: On<HitEvent>,
     mut commands: Commands,
+    mut rng: Single<&mut WyRand, With<GlobalRng>>,
 ) -> Result {
-    let Ok(bit_producer) = weapon.get(trigger.weapon) else {
-        return Ok(());
-    };
-    let attacker_trans = transforms.get(trigger.attacker)?.compute_transform();
-    let target_trans = transforms.get(trigger.target)?.compute_transform();
-
-    let direction = target_trans.translation - attacker_trans.translation;
-    let mut rng = rand::rng();
-
-    for _ in 0..bit_producer.0 {
-        let direction = random_direction_in_arc(direction.xy(), PI * 0.75, &mut rng);
-
+    let direction = hit.target_translation - hit.attacker_translation;
+    for _ in 0..hit.bits {
+        let direction = random_direction_in_arc(direction, PI * 0.75, &mut rng);
         commands.spawn((
             Bit,
-            Transform::from_translation(target_trans.translation),
+            Transform::from_translation(hit.target_translation.extend(0.0)),
             LinearVelocity(direction * BITS_SPEED * rng.random_range(0.8..1.2)),
         ));
     }
-
     Ok(())
 }
 

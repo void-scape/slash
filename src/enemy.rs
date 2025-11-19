@@ -1,10 +1,10 @@
 use crate::{
     Layer,
     bits::coalescence::CoalesceEvent,
-    health::{DeathEvent, DeathSystems, EnemyHurtbox, Health},
+    health::{DeathEvent, DeathSystems, EnemyHurtbox, MaxHealth},
     physics::{Acceleration, CustomPhysicsSystems},
     player::Player,
-    weapon::{Broadsword, Dagger, Pistol, TriggerWeapon, Weapon, WeaponPickup, WeaponReach},
+    weapon::{self, Broadsword, Dagger, Pistol, TriggerWeapon, Weapon, WeaponPickup, WeaponReach},
 };
 use avian2d::prelude::{
     Collider, ColliderOf, CollisionLayers, LockedAxes, MaxLinearSpeed, RigidBody,
@@ -67,6 +67,7 @@ fn spawn_enemy(
     if let Ok(player) = player.single() {
         entity.insert(SteerTarget(player));
     }
+    entity.observe(weapon::weapon_knockback);
     sample_enemy_type(entity, &mut rng);
     Ok(())
 }
@@ -78,7 +79,7 @@ fn sample_enemy_type(mut entity: EntityCommands, rng: &mut impl Rng) {
             let size = 20.0;
             entity.insert((
                 Sprite::from_color(RED, Vec2::splat(size)),
-                Health::new(3.0),
+                MaxHealth(3.0),
                 children![
                     (
                         EnemyHurtbox,
@@ -93,7 +94,7 @@ fn sample_enemy_type(mut entity: EntityCommands, rng: &mut impl Rng) {
             let size = 25.0;
             entity.insert((
                 Sprite::from_color(GREEN, Vec2::splat(size)),
-                Health::new(2.0),
+                MaxHealth(2.0),
                 children![
                     (
                         EnemyHurtbox,
@@ -108,7 +109,7 @@ fn sample_enemy_type(mut entity: EntityCommands, rng: &mut impl Rng) {
             let size = 30.0;
             entity.insert((
                 Sprite::from_color(BLUE, Vec2::splat(size)),
-                Health::new(4.0),
+                MaxHealth(4.0),
                 children![
                     (
                         EnemyHurtbox,
